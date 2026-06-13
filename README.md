@@ -10,6 +10,12 @@
 
 ---
 
+
+### LIVE SITE 
+
+signodes-weather-window.netlify.app
+
+
 ## 📖 Overview
 
 The **NIET Smart Weather Station** is a campus-wide IoT-based environmental monitoring system designed to collect, process, and visualize real-time weather data from distributed sensor nodes across the NIET campus.
