@@ -10,31 +10,12 @@
 
 ---
 
-
-## 🌐 Live Demo
-
-👉 **Open Dashboard:** [https://signodes-weather-window.netlify.app](https://signodes-weather-window.netlify.app)
-
-
 ## 🚀 Live Deployment
 
 🔗 **Dashboard:** https://signodes-weather-window.netlify.app
 
 Access the real-time weather monitoring dashboard to view live environmental data collected from NIET campus sensor nodes.
 
-
-# 🌦️ NIET Smart Weather Station
-
-<p align="center">
-  <strong>Campus-Scale IoT Weather Monitoring System</strong>
-</p>
-
-<p align="center">
-  <a href="https://signodes-weather-window.netlify.app">🌐 Live Demo</a> •
-  <a href="#features">✨ Features</a> •
-  <a href="#installation">⚙️ Installation</a> •
-  <a href="#architecture">🏗️ Architecture</a>
-</p>
 
 
 ## 📖 Overview
