@@ -249,7 +249,7 @@ Real-Time Visualization
 ## Clone Repository
 
 ```bash
-git clone https://github.com/yourusername/NIET-Weather-Station.git
+git clone https://github.com/buildwithshlok/NIET-Weather-Station.git
 
 cd NIET-Weather-Station
 ```
@@ -303,7 +303,8 @@ npm run preview
 Add Dashboard Screenshot Here
 
 ```md
-![Dashboard](docs/screenshots/dashboard.png)
+<img width="1873" height="788" alt="image" src="https://github.com/user-attachments/assets/854b28ab-d216-431f-b98c-3cb9712545c3" />
+
 ```
 
 ### Hardware Node
@@ -311,7 +312,10 @@ Add Dashboard Screenshot Here
 Add Sensor Node Image Here
 
 ```md
-![Hardware](docs/screenshots/node.jpg)
+
+<img width="1936" height="1352" alt="image" src="https://github.com/user-attachments/assets/23c94602-6c44-4e8a-aa76-a20c252ed83a" />
+
+
 ```
 
 ### Deployment Site
@@ -319,7 +323,7 @@ Add Sensor Node Image Here
 Add Campus Deployment Images Here
 
 ```md
-![Deployment](docs/screenshots/deployment.jpg)
+<img width="1873" height="788" alt="image" src="https://github.com/user-attachments/assets/0db0d57d-3a56-4589-85f5-c996cd5cfc12" />
 ```
 
 ---
