@@ -302,29 +302,27 @@ npm run preview
 
 Add Dashboard Screenshot Here
 
-```md
+
 <img width="1873" height="788" alt="image" src="https://github.com/user-attachments/assets/854b28ab-d216-431f-b98c-3cb9712545c3" />
 
-```
+
 
 ### Hardware Node
 
 Add Sensor Node Image Here
 
-```md
+
 
 <img width="1936" height="1352" alt="image" src="https://github.com/user-attachments/assets/23c94602-6c44-4e8a-aa76-a20c252ed83a" />
 
 
-```
 
 ### Deployment Site
 
 Add Campus Deployment Images Here
 
-```md
 <img width="1873" height="788" alt="image" src="https://github.com/user-attachments/assets/0db0d57d-3a56-4589-85f5-c996cd5cfc12" />
-```
+
 
 ---
 
