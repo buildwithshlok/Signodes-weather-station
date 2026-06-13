@@ -1,7 +1,8 @@
 # 🌦️ NIET Smart Weather Station
 
 <p align="center">
-  <img src="docs/screenshots/dashboard.png" alt="NIET Weather Station Dashboard" width="900"/>
+  <img src="<img width="1439" height="691" alt="image" src="https://github.com/user-attachments/assets/f357d84f-69c8-4df8-b0fb-47ad4d737e0d" />
+" alt="NIET Weather Station Dashboard" width="900"/>
 </p>
 
 <p align="center">
