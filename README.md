@@ -27,6 +27,7 @@ A professional-grade, real-time weather monitoring dashboard for NIET campus tha
    ```bash
    npm install
    ```
+<img width="1439" height="691" alt="image" src="https://github.com/user-attachments/assets/e9173847-4c9e-40cc-b86b-94a8a6947d60" />
 
 2. **Configure environment variables**
    ```bash
