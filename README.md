@@ -1,9 +1,7 @@
 # 🌦️ NIET Smart Weather Station
 
-<p align="center">
-  <img src="<img width="1439" height="691" alt="image" src="https://github.com/user-attachments/assets/f357d84f-69c8-4df8-b0fb-47ad4d737e0d" />
-" alt="NIET Weather Station Dashboard" width="900"/>
-</p>
+<img width="1439" height="691" alt="image" src="https://github.com/user-attachments/assets/ec3a26ea-ee60-4fa1-a319-792f971f05f2" />
+
 
 <p align="center">
   <strong>Campus-Scale IoT Weather Monitoring System</strong><br>
