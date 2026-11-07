@@ -1,7 +1,7 @@
 import React from 'react';
 import { Thermometer, Droplets, Wind, Gauge, Sun, CloudRain, MapPin } from 'lucide-react';
 import { NodeData } from '../../context/NodesContext';
-import { calibrateAQI, normalizeUVIndex, getAQICategory } from '../../utils/sensorCalibration';
+import { normalizeUVIndex, getAirQualityCategory } from '../../utils/sensorCalibration';
 import { useDarkMode } from '../../context/DarkModeContext';
 import NoDataBadge from '../common/NoDataBadge';
 import RPIWidget from './RPIWidget';
@@ -29,9 +29,8 @@ const SensorNodeInfo: React.FC<SensorNodeInfoProps> = ({ node }) => {
   
   if (!node) return null;
 
-  // Use calibration utility to calculate AQI from PM2.5 and PM10 values
-  const aqi = calibrateAQI(Number(node.aqi25val || 0), Number(node.aqi10val || 0));
-  const aqiInfo = getAQICategory(aqi);
+  // Air quality category based directly on genuine PM2.5 (0-800 scale)
+  const aqiInfo = getAirQualityCategory(Number(node.aqi25val || 0));
   
   // Normalize UV index to percentage
   const uvPercentage = normalizeUVIndex(Number(node.uvIndex || 0));
@@ -47,8 +46,8 @@ const SensorNodeInfo: React.FC<SensorNodeInfoProps> = ({ node }) => {
           <p className={`text-xs ${darkMode ? 'text-gray-300' : 'text-gray-500'} mt-1`}>{node.location || 'Unknown location'}</p>
         </div>
         <div className="text-right">
-          <div className={`text-xs ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>AQI</div>
-          <div className={`text-2xl font-bold ${aqiInfo.textColor}`}>{isNaN(aqi) ? 'N/A' : aqi}</div>
+          <div className={`text-xs ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>PM2.5</div>
+          <div className={`text-2xl font-bold ${aqiInfo.textColor}`}>{node.aqi25val !== null && node.aqi25val !== undefined ? `${node.aqi25val} µg/m³` : 'N/A'}</div>
           <div className={`text-xs font-medium ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>{aqiInfo.category}</div>
         </div>
       </div>
@@ -82,7 +81,7 @@ const SensorNodeInfo: React.FC<SensorNodeInfoProps> = ({ node }) => {
           <div className={`flex items-center gap-2 ${darkMode ? 'text-amber-400' : 'text-amber-700'} font-semibold`}>
             <Gauge className="w-4 h-4" /> PM 2.5 / PM 10
           </div>
-          <div className={`text-xl font-bold ${darkMode ? 'text-amber-300' : 'text-amber-700'} mt-1`}>{node.aqi25val ?? 'N/A'} / {node.aqi10val ?? 'N/A'}</div>
+          <div className={`text-xl font-bold ${darkMode ? 'text-amber-300' : 'text-amber-700'} mt-1`}>{node.aqi25val ? `${node.aqi25val} µg/m³` : 'N/A'} / {node.aqi10val ? `${node.aqi10val} µg/m³` : 'N/A'}</div>
         </div>
       </div>
 

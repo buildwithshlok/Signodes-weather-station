@@ -167,7 +167,7 @@ const SensorDetailsModal: React.FC<SensorDetailsModalProps> = ({
                   <Gauge className={`w-5 h-5 mr-2 ${darkMode ? 'text-signodes-500' : 'text-signodes-500'}`} />
                   <span className="font-medium">Air Quality</span>
                 </div>
-                <span className={`font-bold ${darkMode ? 'text-white' : 'text-signodes-500'}`}>{sensorData.aqi} AQI</span>
+                <span className={`font-bold ${darkMode ? 'text-white' : 'text-signodes-500'}`}>{sensorData.aqi} µg/m³</span>
               </div>
             )}
             

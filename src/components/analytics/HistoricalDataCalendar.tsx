@@ -26,7 +26,7 @@ const HistoricalDataCalendar: React.FC = () => {
           if (m2) return `${m2[3]}-${m2[2]}-${m2[1]}`;
           const d = new Date(t);
           if (isNaN(d.getTime())) return null;
-          return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         };
 
         const rows: SensorData[] = await fetchAllHistoricalData();
@@ -37,7 +37,7 @@ const HistoricalDataCalendar: React.FC = () => {
         for (const r of rows) {
           const dateKey = normalizeDateKey(r.lastUpdated as string | undefined);
           if (!dateKey) continue;
-          const aqi = Math.max(Number(r.aqi25val || 0), Number(r.aqi10val || 0));
+          const aqi = Number(r.aqi25val || 0);
           const temp = Number(r.temperature || 0);
           const hum = Number(r.humidity || 0);
           const cur = agg[dateKey] || { aqi: 0, temperature: 0, humidity: 0, count: 0 };
@@ -55,7 +55,7 @@ const HistoricalDataCalendar: React.FC = () => {
         });
 
         const dateKeys = Object.keys(averaged).sort();
-        console.log(`[HistoricalDataCalendar] Aggregated ${dateKeys.length} days. Range: ${dateKeys[0]} to ${dateKeys[dateKeys.length-1]}`);
+        console.log(`[HistoricalDataCalendar] Aggregated ${dateKeys.length} days. Range: ${dateKeys[0]} to ${dateKeys[dateKeys.length - 1]}`);
         if (!cancelled) setDailyData(averaged);
       } catch (e: unknown) {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load data');
@@ -86,7 +86,7 @@ const HistoricalDataCalendar: React.FC = () => {
     if (aqi <= 300) return 'bg-purple-600';
     return 'bg-red-900';
   };
-  
+
   const getAQITextColor = (aqi: number) => {
     if (darkMode) {
       if (aqi <= 50) return 'text-green-400';
@@ -135,9 +135,8 @@ const HistoricalDataCalendar: React.FC = () => {
         days.push(
           <div
             key={`w-${i}`}
-            className={`h-20 border ${darkMode ? 'border-slate-700/50' : 'border-slate-200'} rounded-xl cursor-pointer transition-all duration-200 hover:shadow-md ${
-              isSelected ? `ring-2 ring-sky-500 ${darkMode ? 'bg-sky-900/20' : 'bg-sky-50'}` : `${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'}`
-            } ${isToday ? `${darkMode ? 'bg-slate-800 border-slate-600' : 'bg-slate-100 border-slate-300'}` : `${darkMode ? 'bg-slate-900/50' : 'bg-white'}`}`}
+            className={`h-20 border ${darkMode ? 'border-slate-700/50' : 'border-slate-200'} rounded-xl cursor-pointer transition-all duration-200 hover:shadow-md ${isSelected ? `ring-2 ring-sky-500 ${darkMode ? 'bg-sky-900/20' : 'bg-sky-50'}` : `${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'}`
+              } ${isToday ? `${darkMode ? 'bg-slate-800 border-slate-600' : 'bg-slate-100 border-slate-300'}` : `${darkMode ? 'bg-slate-900/50' : 'bg-white'}`}`}
             onClick={() => setSelectedDate(date)}
           >
             <div className="p-2 h-full flex flex-col">
@@ -183,9 +182,8 @@ const HistoricalDataCalendar: React.FC = () => {
       days.push(
         <div
           key={day}
-          className={`h-20 border ${darkMode ? 'border-slate-700/50' : 'border-slate-200'} rounded-xl cursor-pointer transition-all duration-200 hover:shadow-md ${
-            isSelected ? `ring-2 ring-sky-500 ${darkMode ? 'bg-sky-900/20' : 'bg-sky-50'}` : `${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'}`
-          } ${isToday ? `${darkMode ? 'bg-slate-800 border-slate-600' : 'bg-slate-100 border-slate-300'}` : `${darkMode ? 'bg-slate-900/50' : 'bg-white'}`}`}
+          className={`h-20 border ${darkMode ? 'border-slate-700/50' : 'border-slate-200'} rounded-xl cursor-pointer transition-all duration-200 hover:shadow-md ${isSelected ? `ring-2 ring-sky-500 ${darkMode ? 'bg-sky-900/20' : 'bg-sky-50'}` : `${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'}`
+            } ${isToday ? `${darkMode ? 'bg-slate-800 border-slate-600' : 'bg-slate-100 border-slate-300'}` : `${darkMode ? 'bg-slate-900/50' : 'bg-white'}`}`}
           onClick={() => setSelectedDate(new Date(dateString))}
         >
           <div className="p-2 h-full flex flex-col">
@@ -260,23 +258,21 @@ const HistoricalDataCalendar: React.FC = () => {
                     <div className={`flex items-center space-x-2 bg-${darkMode ? 'slate-900/50' : 'slate-100'} p-1 rounded-lg border ${darkMode ? 'border-slate-700' : 'border-slate-200'} ml-4`}>
                       <button
                         onClick={() => setViewMode('month')}
-                        className={`px-4 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider transition-colors ${
-                          viewMode === 'month' ? (darkMode ? 'bg-slate-700 text-slate-100 shadow-sm' : 'bg-white text-slate-900 shadow-sm') : `${darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'}`
-                        }`}
+                        className={`px-4 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider transition-colors ${viewMode === 'month' ? (darkMode ? 'bg-slate-700 text-slate-100 shadow-sm' : 'bg-white text-slate-900 shadow-sm') : `${darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'}`
+                          }`}
                       >
                         Month
                       </button>
                       <button
                         onClick={() => setViewMode('week')}
-                        className={`px-4 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider transition-colors ${
-                          viewMode === 'week' ? (darkMode ? 'bg-slate-700 text-slate-100 shadow-sm' : 'bg-white text-slate-900 shadow-sm') : `${darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'}`
-                        }`}
+                        className={`px-4 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider transition-colors ${viewMode === 'week' ? (darkMode ? 'bg-slate-700 text-slate-100 shadow-sm' : 'bg-white text-slate-900 shadow-sm') : `${darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'}`
+                          }`}
                       >
                         Week
                       </button>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center space-x-2">
                     <button
                       onClick={() => navigateMonth('prev')}
@@ -303,7 +299,7 @@ const HistoricalDataCalendar: React.FC = () => {
                       </div>
                     ))}
                   </div>
-                  
+
                   {/* Calendar Days */}
                   <div className="grid grid-cols-7 gap-2">
                     {renderCalendarDays()}
@@ -347,14 +343,14 @@ const HistoricalDataCalendar: React.FC = () => {
               {/* Selected Date Info */}
               <div className={`${darkMode ? 'bg-slate-800/80 border-slate-700/50' : 'bg-white border-slate-200'} border rounded-2xl shadow-xl p-6 relative overflow-hidden`} style={{ backdropFilter: 'blur(12px)' }}>
                 <h4 className={`text-xl tracking-tight font-bold ${darkMode ? 'text-slate-100' : 'text-slate-900'} mb-5`}>
-                  {selectedDate.toLocaleDateString('en-US', { 
-                    weekday: 'short', 
-                    year: 'numeric', 
-                    month: 'short', 
-                    day: 'numeric' 
+                  {selectedDate.toLocaleDateString('en-US', {
+                    weekday: 'short',
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
                   })}
                 </h4>
-                
+
                 {selectedDayData ? (
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
@@ -367,12 +363,12 @@ const HistoricalDataCalendar: React.FC = () => {
                         <div className={`text-3xl font-bold tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>{selectedDayData.temperature}°</div>
                       </div>
                     </div>
-                    
+
                     <div className={`${darkMode ? 'bg-sky-900/10 border-sky-800/30' : 'bg-sky-50 border-sky-100'} p-4 rounded-xl border`}>
                       <div className={`text-xs font-semibold uppercase tracking-wider mb-2 ${darkMode ? 'text-sky-400' : 'text-sky-600'}`}>Humidity</div>
                       <div className={`text-3xl font-bold tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>{selectedDayData.humidity}%</div>
                     </div>
-                    
+
                     <div className={`pt-5 mt-5 border-t ${darkMode ? 'border-slate-700/50' : 'border-slate-200'} space-y-3`}>
                       <div className="flex justify-between items-center">
                         <span className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Data Points</span>

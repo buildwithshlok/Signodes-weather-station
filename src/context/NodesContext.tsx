@@ -2,6 +2,8 @@ import React, { useContext, useEffect, useState, useCallback } from 'react';
 import { fetchRecentSensorData } from '../services/googleSheetsService';
 import { NodesContext } from './nodes.context';
 import { NodeData, NodesContextType } from './nodes.types';
+import { getSimulatedPressure } from '../utils/simulatedPressure';
+import { estimateRainFromHumidity } from '../utils/rainEstimation';
 export type { NodeData };
 
 export const NodesProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -12,23 +14,18 @@ export const NodesProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Memoize fetchData to prevent unnecessary interval recreations
   const fetchData = useCallback(async () => {
     let mounted = true;
-    let timeoutId: NodeJS.Timeout | null = null;
 
     try {
-      setLoading(true);
-
-      // Create abort signal for the fetch request (15 second timeout)
-      const controller = new AbortController();
-      timeoutId = setTimeout(() => controller.abort(), 15000);
+      // Only show full loading state if we have no prior node readings
+      setNodes((current) => {
+        if (!current || current.length === 0) {
+          setLoading(true);
+        }
+        return current;
+      });
 
       // Fetch only the single latest row (readrange1) to save maximum bandwidth
       const sensorData = await fetchRecentSensorData(1);
-
-      // Clear timeout on successful fetch
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-        timeoutId = null;
-      }
 
       if (!mounted) return;
 
@@ -36,12 +33,14 @@ export const NodesProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         // Use the most recent reading for Node A
         const latest = sensorData[sensorData.length - 1];
 
-        // Create Node A with actual data
+        // Create Node A with actual data (live pressure simulated & rain estimated from DHT humidity)
         const nodeA: NodeData = {
           ...latest,
           id: 'node-A',
           name: 'Node A',
           location: latest.location || 'Block A',
+          pressure: getSimulatedPressure(latest.lastUpdated),
+          rain: estimateRainFromHumidity(latest.humidity),
         };
 
         // Create Nodes B and C with current data (empty placeholders)
@@ -59,7 +58,7 @@ export const NodesProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           aqi10val: null,
           uvIndex: null,
           uvRisk: 'N/A',
-          rain: 'N/A',
+          rain: 'Unknown',
           mq_co: null,
           lastUpdated: 'N/A',
         });
@@ -71,7 +70,8 @@ export const NodesProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setError(null);
       } else {
         setError(new Error('No recent data found in Google Sheets'));
-        setNodes([]);
+        // Preserve prior valid state on empty response
+        setNodes((prevNodes) => (prevNodes && prevNodes.length > 0 ? prevNodes : []));
       }
     } catch (error) {
       if (!mounted) return;
@@ -86,13 +86,9 @@ export const NodesProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           ? error
           : new Error('Failed to fetch sensor data')
       );
-      setNodes([]);
+      // Requirement 3: Preserve last valid readings if API fails
+      setNodes((prevNodes) => (prevNodes && prevNodes.length > 0 ? prevNodes : []));
     } finally {
-      // Clean up timeout
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-
       if (mounted) {
         setLoading(false);
       }
@@ -101,9 +97,6 @@ export const NodesProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Return cleanup function to prevent state updates on unmounted component
     return () => {
       mounted = false;
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
     };
   }, []);
 

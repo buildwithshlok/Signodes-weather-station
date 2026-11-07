@@ -14,6 +14,12 @@
 
 # API redirects - proxy API requests to Netlify Functions (must come before SPA redirect)
 [[redirects]]
+  from = "/api"
+  to = "/.netlify/functions/sensorData"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/sensorData"
   status = 200

@@ -3,7 +3,7 @@
  * Used when backend API is unavailable
  */
 
-import { SensorData } from '../services/googleSheetsService';
+import type { SensorData } from './googleSheetsService.ts';
 
 export const MOCK_SENSOR_DATA: SensorData[] = [
   {
@@ -20,7 +20,7 @@ export const MOCK_SENSOR_DATA: SensorData[] = [
     uvIndex: 5.2,
     uvRisk: 'Moderate',
     rain: 'No',
-    mq_co: 55,   // realistic mW/cm² range (actual sensor output)
+    mq_co: 55,
     lastUpdated: new Date(Date.now() - 2 * 60000).toISOString(),
   },
   {

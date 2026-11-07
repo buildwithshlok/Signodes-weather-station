@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { calculateRPI } from '../utils/sensorCalibration';
 
 const isValidData = (val: unknown): boolean => {
-  return val !== null && val !== undefined && val !== 0 && val !== 'N/A' && val !== '';
+  return val !== null && val !== undefined && val !== 'N/A' && val !== '';
 };
 
 const getAqiColor = (aqi: number) => {
@@ -62,7 +62,7 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  if (loading) {
+  if (loading && (!nodes || nodes.length === 0)) {
     return (
       <div className={`text-center py-8 ${darkMode ? 'text-gray-100' : 'text-gray-700'}`}>
         Loading sensor data...
@@ -70,7 +70,7 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  if (error) {
+  if (error && (!nodes || nodes.length === 0)) {
     return (
       <div className="text-center py-8 text-red-500">
         Error: {error.message}
@@ -96,6 +96,13 @@ const Dashboard: React.FC = () => {
     <div className="space-y-8 px-4 sm:px-6 py-6">
 
       <DevModeBanner useMockData={import.meta.env.VITE_USE_MOCK_DATA === 'true'} />
+
+      {error && nodes.length > 0 && (
+        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-500 flex items-center gap-2">
+          <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+          <span>Connection interrupted ({error.message}). Displaying last verified sensor readings.</span>
+        </div>
+      )}
 
       {selectedSensor && (
        <SensorDetailsModal
@@ -179,7 +186,14 @@ const Dashboard: React.FC = () => {
 
             </div>
 
-            {/* SENSOR DATA */}
+            {/* SENSOR DATA / EMPTY STATE */}
+            {node.temperature === null && node.humidity === null && node.aqi25val === null ? (
+              <div className={`py-8 text-center rounded-xl border border-dashed my-3 ${darkMode ? 'border-primary-700/60 bg-primary-800/20' : 'border-gray-200 bg-gray-50'}`}>
+                <Wifi className={`w-8 h-8 mx-auto mb-2 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
+                <p className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Node Hardware Not Connected</p>
+                <p className={`text-xs mt-1 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Telemetry channel pending deployment</p>
+              </div>
+            ) : (
             <div className="space-y-4">
 
               {/* TEMPERATURE */}
@@ -219,9 +233,9 @@ const Dashboard: React.FC = () => {
 
                 <span className={`px-3 py-1 rounded-full text-xs font-medium flex items-center ${node.aqi25val === null
                   ? (darkMode ? 'bg-primary-800 text-transparent animate-pulse' : 'bg-gray-200 text-transparent animate-pulse')
-                  : getAqiColor(node.aqi25val)
+                  : getAqiColor(Number(node.aqi25val) || 0)
                   }`}>
-                  {node.aqi25val !== null ? `AQI: ${node.aqi25val}` : 'Wait'}
+                  {node.aqi25val !== null ? `${node.aqi25val} µg/m³` : 'N/A'}
                 </span>
               </div>
 
@@ -289,6 +303,9 @@ const Dashboard: React.FC = () => {
                 </span>
               </div>
 
+            </div>
+            )}
+
               {/* FOOTER */}
               <div className={`pt-3 text-xs flex justify-between border-t ${darkMode ? 'text-white/70 border-primary-700' : 'text-gray-500 border-gray-200'}`}>
                 <span>
@@ -299,8 +316,6 @@ const Dashboard: React.FC = () => {
 
                 <Wifi className="w-4 h-4 text-signodes-500" />
               </div>
-
-            </div>
 
           </motion.div>
 
