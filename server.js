@@ -13,6 +13,7 @@ import express from 'express';
 import cors from 'cors';
 import axios from 'axios';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 
 // Load environment variables
 if (fs.existsSync('.env')) {
@@ -22,12 +23,13 @@ if (fs.existsSync('.env')) {
   console.log('[server] Loaded environment from .env.development');
 }
 
+const isDirectRun = Boolean(process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]);
 const app = express();
 const PORT = process.env.PORT || 3002;
 
 // Validation: ensure GOOGLE_SCRIPT_URL is configured
 const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL;
-if (!GOOGLE_SCRIPT_URL) {
+if (!GOOGLE_SCRIPT_URL && isDirectRun) {
   console.error(
     'CRITICAL: GOOGLE_SCRIPT_URL environment variable is not set. ' +
     'Please configure it before starting the server.'
@@ -61,6 +63,102 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.use(express.json());
+
+export function parseSensorNumber(val) {
+  if (val === undefined || val === null) return null;
+  const str = val.toString().trim();
+  if (str === '' || str === 'N/A' || str === 'null' || str === 'undefined') return null;
+  const num = parseFloat(str);
+  return isNaN(num) ? null : num;
+}
+
+export function getUVRisk(uvIndex) {
+  if (uvIndex <= 20) return 'Low';
+  if (uvIndex <= 40) return 'Moderate';
+  if (uvIndex <= 60) return 'High';
+  if (uvIndex <= 80) return 'Very High';
+  return 'Extreme';
+}
+
+export function parseSensorData(rawData) {
+  if (!rawData) return [];
+  const trimmed = rawData.toString().trim();
+  let sensorData = [];
+
+  // Try JSON format first
+  if (trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        if (parsed.length > 0 && Array.isArray(parsed[0])) {
+          sensorData = parsed.map((row, idx) => {
+            if (!Array.isArray(row) || row.length < 16) return null;
+            return {
+              id: `node-${idx + 1}`,
+              name: 'Node A',
+              location: 'Main Campus',
+              latitude: parseSensorNumber(row[7]),
+              longitude: parseSensorNumber(row[8]),
+              temperature: parseSensorNumber(row[4]), // DHTtemp_C (switched from damaged BMP row[2])
+              dht_temperature: parseSensorNumber(row[4]),
+              bmp_temperature: parseSensorNumber(row[2]),
+              pressure: parseSensorNumber(row[1]),
+              humidity: parseSensorNumber(row[3]),
+              aqi25val: parseSensorNumber(row[6]),
+              aqi10val: parseSensorNumber(row[5]),
+              uvIndex: parseSensorNumber(row[14]),
+              uvRisk: row[15]?.toString().trim() || getUVRisk(parseSensorNumber(row[14]) ?? 0),
+              rain: row[13]?.toString().trim() === 'Yes' ? 'Yes' : 'No',
+              mq_co: parseSensorNumber(row[10]),
+              lastUpdated: row[0]?.toString().trim() || new Date().toISOString(),
+            };
+          }).filter(Boolean);
+        } else {
+          sensorData = parsed;
+        }
+      }
+    } catch {
+      sensorData = [];
+    }
+  }
+
+  // Fallback to CSV parsing (only if JSON didn't work)
+  if (sensorData.length === 0) {
+    const rows = trimmed.split('\n').filter((row) => row.trim() !== '');
+    sensorData = rows
+      .map((row, idx) => {
+        try {
+          const cols = row.split(',');
+          if (cols.length < 16) return null;
+
+          return {
+            id: `node-${idx + 1}`,
+            name: 'Node A',
+            location: 'Main Campus',
+            latitude: parseSensorNumber(cols[7]),
+            longitude: parseSensorNumber(cols[8]),
+            temperature: parseSensorNumber(cols[4]), // DHTtemp_C (switched from damaged BMP cols[2])
+            dht_temperature: parseSensorNumber(cols[4]),
+            bmp_temperature: parseSensorNumber(cols[2]),
+            pressure: parseSensorNumber(cols[1]),
+            humidity: parseSensorNumber(cols[3]),
+            aqi25val: parseSensorNumber(cols[6]),
+            aqi10val: parseSensorNumber(cols[5]),
+            uvIndex: parseSensorNumber(cols[14]),
+            uvRisk: cols[15]?.trim() || getUVRisk(parseSensorNumber(cols[14]) ?? 0),
+            rain: cols[13]?.trim() === 'Yes' ? 'Yes' : 'No',
+            mq_co: parseSensorNumber(cols[10]),
+            lastUpdated: cols[0]?.trim() || new Date().toISOString(),
+          };
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean);
+  }
+
+  return sensorData;
+}
 
 /**
  * Main sensor data API endpoint
@@ -109,98 +207,10 @@ app.get('/api/sensor-data', async (req, res) => {
     );
 
     // Parse data (JSON or CSV)
-    let sensorData = [];
-    const trimmed = response.data.toString().trim();
-    console.log(`[${new Date().toISOString()}] Trimmed response starts with: "${trimmed.substring(0, 50)}"`);
-
-    // Try JSON format first
-    if (trimmed.startsWith('[')) {
-      try {
-        sensorData = JSON.parse(trimmed);
-        console.log(`[${new Date().toISOString()}] Successfully parsed JSON. Type: ${typeof sensorData}, IsArray: ${Array.isArray(sensorData)}`);
-        if (sensorData.length > 0) {
-          console.log(`[${new Date().toISOString()}] First item type: ${Array.isArray(sensorData[0]) ? 'Array' : typeof sensorData[0]}`);
-          if (Array.isArray(sensorData[0])) {
-            console.log(`[${new Date().toISOString()}] First row has ${sensorData[0].length} columns`);
-          }
-        }
-        
-        if (!Array.isArray(sensorData)) {
-          sensorData = [];
-        } else if (sensorData.length > 0 && Array.isArray(sensorData[0])) {
-          // JSON response is array of arrays (CSV-like), convert to objects
-          console.log(`[${new Date().toISOString()}] Converting array of arrays to objects...`);
-          sensorData = sensorData.map((row, idx) => {
-            if (!Array.isArray(row) || row.length < 16) {
-              console.log(`[${new Date().toISOString()}] Skipping invalid row ${idx}:`, row);
-              return null;
-            }
-            
-            const obj = {
-              id: `node-${idx + 1}`,
-              name: 'Node A',
-              location: 'Main Campus',
-              latitude: parseFloat(row[7]?.toString().trim()) || 0,
-              longitude: parseFloat(row[8]?.toString().trim()) || 0,
-              temperature: parseFloat(row[2]?.toString().trim()) || 0,
-              pressure: parseFloat(row[1]?.toString().trim()) || 0,
-              humidity: parseFloat(row[3]?.toString().trim()) || 0,
-              aqi25val: parseFloat(row[6]?.toString().trim()) || 0,
-              aqi10val: parseFloat(row[5]?.toString().trim()) || 0,
-              uvIndex: parseFloat(row[14]?.toString().trim()) || 0,
-              uvRisk: row[15]?.toString().trim() || 'Low',
-              rain: row[13]?.toString().trim() === 'Yes' ? 'Yes' : 'No',
-              mq_co: parseFloat(row[10]?.toString().trim()) || 0,
-              lastUpdated: row[0]?.toString().trim() || new Date().toISOString(),
-            };
-            return obj;
-          }).filter(Boolean);
-          console.log(`[${new Date().toISOString()}] Converted to ${sensorData.length} objects`);
-        } else {
-          console.log(`[${new Date().toISOString()}] JSON is array of objects, using as-is`);
-        }
-      } catch (e) {
-        console.warn(`[${new Date().toISOString()}] JSON parsing failed:`, e.message);
-        sensorData = [];
-      }
-    }
-
-    // Fallback to CSV parsing (only if JSON didn't work)
-    if (sensorData.length === 0) {
-      const rows = trimmed.split('\n').filter((row) => row.trim() !== '');
-      sensorData = rows
-        .map((row, idx) => {
-          try {
-            const cols = row.split(',');
-            if (cols.length < 16) return null;
-
-            return {
-              id: `node-${idx + 1}`,
-              name: 'Node A',
-              location: 'Main Campus',
-              latitude: parseFloat(cols[7]?.trim()) || 0,
-              longitude: parseFloat(cols[8]?.trim()) || 0,
-              temperature: parseFloat(cols[2]?.trim()) || 0,
-              pressure: parseFloat(cols[1]?.trim()) || 0,
-              humidity: parseFloat(cols[3]?.trim()) || 0,
-              aqi25val: parseFloat(cols[6]?.trim()) || 0,
-              aqi10val: parseFloat(cols[5]?.trim()) || 0,
-              uvIndex: parseFloat(cols[14]?.trim()) || 0,
-              uvRisk: cols[15]?.trim() || 'Low',
-              rain: cols[13]?.trim() === 'Yes' ? 'Yes' : 'No',
-              mq_co: parseFloat(cols[10]?.trim()) || 0,
-              lastUpdated: cols[0]?.trim() || new Date().toISOString(),
-            };
-          } catch (error) {
-            console.warn(`Error parsing row ${idx}:`, error);
-            return null;
-          }
-        })
-        .filter(Boolean);
-    }
-
+    const sensorData = parseSensorData(response.data);
     console.log(`[${new Date().toISOString()}] Parsed ${sensorData.length} sensor records`);
 
+    res.setHeader('X-Powered-By-Backend', 'express-local');
     res.json(sensorData);
   } catch (error) {
     console.error(
@@ -249,25 +259,30 @@ app.use((req, res) => {
 /**
  * Start the server
  */
-const server = app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log('Health check: GET /health');
-  console.log('Sensor API: GET /api/sensor-data');
-});
+let server;
+if (isDirectRun) {
+  server = app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log('Health check: GET /health');
+    console.log('Sensor API: GET /api/sensor-data');
+  });
 
-server.on('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
-    console.error(`\n❌ Port ${PORT} is already in use!`);
-    console.error(`   Another server instance may be running.`);
-    console.error(`   Run: kill $(lsof -ti :${PORT}) to free the port, then restart.\n`);
-    process.exit(1);
-  } else {
-    console.error('Server error:', err);
-    process.exit(1);
-  }
-});
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`\n❌ Port ${PORT} is already in use!`);
+      console.error(`   Another server instance may be running.`);
+      console.error(`   Run: kill $(lsof -ti :${PORT}) to free the port, then restart.\n`);
+      process.exit(1);
+    } else {
+      console.error('Server error:', err);
+      process.exit(1);
+    }
+  });
 
-// Graceful shutdown
-process.on('SIGTERM', () => { server.close(() => process.exit(0)); });
-process.on('SIGINT',  () => { server.close(() => process.exit(0)); });
+  // Graceful shutdown
+  process.on('SIGTERM', () => { server.close(() => process.exit(0)); });
+  process.on('SIGINT',  () => { server.close(() => process.exit(0)); });
+}
+
+export { app };

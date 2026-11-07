@@ -10,16 +10,35 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+graphify-out/
+WEATHER_STATION_DATAFLOW.md
 *.local
+*.tsbuildinfo
 
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
 .idea
 .DS_Store
+Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# Environment & secrets
 .env
+.env*.local
+
+# Netlify local cache
+.netlify/
+
+# AI agents & assistants local caches
+.codex/
+AGENTS.md
+
+# Testing & linting
+coverage/
+.eslintcache
+

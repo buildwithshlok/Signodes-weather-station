@@ -1,10 +1,13 @@
 /**
  * Google Sheets Sensor Data Service
  * Handles fetching and parsing sensor data from Google Apps Script
- * Falls back to mock data in development when API is unavailable
+ * Direct integration with fallback to proxy or direct Google Script URL
  */
 
 import { z } from 'zod';
+import { API_BASE, GOOGLE_SCRIPT_URL, COLS, getUVRisk } from '../config/api.ts';
+import { parseSensorNumber } from '../utils/sensorFormatting.ts';
+import { generateMockSensorData, generateHistoricalMockData } from './mockData.ts';
 
 export const SensorDataSchema = z.object({
   id: z.string(),
@@ -13,6 +16,8 @@ export const SensorDataSchema = z.object({
   latitude: z.number().nullable(),
   longitude: z.number().nullable(),
   temperature: z.number().nullable(),
+  dht_temperature: z.number().nullable().optional(),
+  bmp_temperature: z.number().nullable().optional(),
   pressure: z.number().nullable(),
   humidity: z.number().nullable(),
   aqi25val: z.number().nullable(),
@@ -26,13 +31,15 @@ export const SensorDataSchema = z.object({
 
 export type SensorData = z.infer<typeof SensorDataSchema>;
 
-import { API_BASE } from '../config/api';
-import { generateMockSensorData, generateHistoricalMockData } from './mockData';
-
 // API Configuration
 const API_URL = `${API_BASE}`;
 const REQUEST_TIMEOUT = 30000; // 30 seconds
-const USE_MOCK_DATA = import.meta.env.MODE === 'development' && import.meta.env.VITE_USE_MOCK_DATA === 'true';
+
+const metaEnv = (import.meta as unknown as { env?: Record<string, string> }).env;
+const nodeEnv = typeof process !== 'undefined' ? process.env : {};
+const isDevMode = metaEnv?.MODE === 'development' || nodeEnv?.NODE_ENV === 'development';
+const isMockForced = metaEnv?.VITE_USE_MOCK_DATA === 'true' || nodeEnv?.VITE_USE_MOCK_DATA === 'true';
+const USE_MOCK_DATA = Boolean(isDevMode && isMockForced);
 
 // In-memory cache for historical data
 let historicalDataCache: SensorData[] | null = null;
@@ -59,7 +66,7 @@ async function fetchWithTimeout(
       ...options,
       signal: controller.signal,
       headers: {
-        Accept: 'application/json',
+        Accept: 'application/json, text/plain',
         'Cache-Control': 'no-cache',
         ...options.headers,
       },
@@ -76,7 +83,7 @@ async function fetchWithTimeout(
   }
 }
 
-function isValidSensorData(data: unknown): data is SensorData {
+export function isValidSensorData(data: unknown): data is SensorData {
   const result = SensorDataSchema.safeParse(data);
   if (!result.success) {
     console.warn('[Validation Failed]', result.error);
@@ -85,99 +92,166 @@ function isValidSensorData(data: unknown): data is SensorData {
 }
 
 /**
- * Fetch all sensor data (from start of sheet to present)
- * Uses multiple strategies to ensure complete historical data retrieval
- * Falls back to mock data in development when API is unavailable
- * @returns {Promise<SensorData[]>} - Array of all sensor data from beginning of sheet
- * @throws {Error} - If fetch fails and not in development mode
+ * Normalizes a raw array of columns from Google Apps Script into a canonical SensorData object
  */
-export async function fetchSensorData(): Promise<SensorData[]> {
-  // In development mode with mock data enabled, skip API calls entirely
-  if (USE_MOCK_DATA) {
-    console.log('[fetchSensorData] Using mock data for development');
-    return generateHistoricalMockData(192); // ~6 months: Aug 30 to Mar 9
-  }
-
-  try {
-    console.log('[fetchSensorData] Starting data fetch from Google Sheet...');
-    
-    // First attempt: Try with a reasonable range to get all data
-    let allData: SensorData[] = [];
-    
-    // Try fetching with readrange5000 (shorter range for typical dashboard load)
-    try {
-      console.log('[fetchSensorData] Attempting to fetch 5,000 rows...');
-      const response = await fetchWithTimeout(`${API_URL}?sts=readrange5000`, {
-        method: 'GET',
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      if (!Array.isArray(data)) {
-        throw new Error('Expected array of sensor data');
-      }
-
-      console.log(`[fetchSensorData] Received ${data.length} raw records from API`);
-
-      // Validate data
-      const validData = data.filter((item) => {
-        if (!isValidSensorData(item)) {
-          return false;
-        }
-        return true;
-      });
-
-      console.log(`[fetchSensorData] Validated ${validData.length} sensor records`);
-      allData = validData;
-    } catch {
-      console.warn('[fetchSensorData] Failed with readrange5000, trying alternate endpoint...');
-      
-      // Fallback: Try with read endpoint which might return all available data
-      try {
-        const response = await fetchWithTimeout(`${API_URL}?sts=readall`, {
-          method: 'GET',
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          if (Array.isArray(data)) {
-            const validData = data.filter((item) => isValidSensorData(item));
-            console.log(`[fetchSensorData] Got ${validData.length} records from readall endpoint`);
-            allData = validData;
-          }
-        }
-      } catch {
-        console.warn('[fetchSensorData] readall endpoint also failed');
-      }
-    }
-
-    if (allData.length === 0) {
-      throw new Error('No valid sensor data received from any endpoint');
-    }
-
-    console.log(`[fetchSensorData] Successfully loaded ${allData.length} total records`);
-    return allData;
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[fetchSensorData] Error fetching sensor data:', errorMessage);
-    
-    // Development fallback: use historical mock data to allow testing without backend
-    if (import.meta.env.MODE === 'development') {
-      console.warn('[fetchSensorData] API unavailable - using mock data fallback for development');
-      return generateHistoricalMockData(192); // ~6 months: Aug 30 to Mar 9
-    }
-
-    throw new Error(`Failed to fetch sensor data: ${errorMessage}`);
-  }
+export function normalizeRawRow(row: unknown[], idx: number = 0): SensorData {
+  return {
+    id: `node-${idx + 1}`,
+    name: 'Node A',
+    location: 'Main Campus',
+    latitude: parseSensorNumber(row[COLS.latitude]),
+    longitude: parseSensorNumber(row[COLS.longitude]),
+    temperature: parseSensorNumber(row[COLS.temperature]), // DHTtemp_C (switched from damaged BMP row[2])
+    dht_temperature: parseSensorNumber(row[COLS.temperature]),
+    bmp_temperature: parseSensorNumber(row[COLS.bmp_temperature]),
+    pressure: parseSensorNumber(row[COLS.pressure]),
+    humidity: parseSensorNumber(row[COLS.humidity]),
+    aqi25val: parseSensorNumber(row[COLS.aqi25]),
+    aqi10val: parseSensorNumber(row[COLS.aqi10]),
+    uvIndex: parseSensorNumber(row[COLS.uvIndex]),
+    uvRisk: row[COLS.uvRisk]?.toString().trim() || getUVRisk(parseSensorNumber(row[COLS.uvIndex]) ?? 0),
+    rain: row[COLS.rain]?.toString().trim() === 'Yes' ? 'Yes' : 'No',
+    mq_co: parseSensorNumber(row[COLS.mq_co]),
+    lastUpdated: row[COLS.datetime]?.toString().trim() || new Date().toISOString(),
+  };
 }
 
 /**
- * Fetch ALL historical sensor data using chunked requests of 5000 records at a time.
- * This avoids Google Apps Script timeouts that occur with very large single requests.
+ * Normalizes raw payload (either array of arrays or array of objects) into SensorData[]
+ */
+export function normalizeSensorPayload(data: unknown): SensorData[] {
+  if (!Array.isArray(data)) return [];
+  if (data.length === 0) return [];
+
+  // Case 1: Array of arrays (raw Google Apps Script / CSV format)
+  if (Array.isArray(data[0])) {
+    return (data as unknown[][])
+      .map((row, idx) => (Array.isArray(row) && row.length >= 14 ? normalizeRawRow(row, idx) : null))
+      .filter((item): item is SensorData => item !== null && isValidSensorData(item));
+  }
+
+  // Case 2: Array of objects (already parsed by backend server)
+  return (data as unknown[]).filter((item): item is SensorData => isValidSensorData(item));
+}
+
+/**
+ * Fetch most recent N rows of sensor data
+ * Uses Apps Script "readrangeN" endpoint (e.g., readrange1 for latest row)
+ * Tries local /api proxy first, with automatic direct Google Apps Script fallback
+ */
+export async function fetchRecentSensorData(count: number): Promise<SensorData[]> {
+  const validCount = Math.max(1, Math.floor(count));
+
+  // If mock mode is explicitly forced via VITE_USE_MOCK_DATA
+  if (USE_MOCK_DATA) {
+    const mockList = generateMockSensorData().slice(0, validCount);
+    const latest = mockList[mockList.length - 1];
+    console.warn(
+      `[SENSOR DATA TRACE]\n` +
+      `  • Source:              Mock Generator\n` +
+      `  • Record Timestamp:    ${latest?.lastUpdated ?? 'N/A'}\n` +
+      `  • Temperature:         ${latest?.temperature ?? 'N/A'} °C\n` +
+      `  • Humidity:            ${latest?.humidity ?? 'N/A'} %\n` +
+      `  • PM2.5:               ${latest?.aqi25val ?? 'N/A'}\n` +
+      `  • PM10:                ${latest?.aqi10val ?? 'N/A'}\n` +
+      `  • Mock Mode Enabled:   YES (VITE_USE_MOCK_DATA=true)\n` +
+      `  • Fallback Activated:  NO`
+    );
+    return mockList;
+  }
+
+  let rawData: unknown = null;
+  let fetchError: Error | null = null;
+  let detectedSource: 'Express Server (/api/sensor-data)' | 'Netlify Function' | 'Direct Google Apps Script' = 'Direct Google Apps Script';
+  let fallbackActivated = false;
+
+  // Strategy 1: Try proxy endpoint (/api)
+  try {
+    const response = await fetchWithTimeout(
+      `${API_URL}?sts=readrange${validCount}`,
+      { method: 'GET' },
+      15000
+    );
+    if (response.ok) {
+      const text = await response.text();
+      // Ensure response is JSON and not an HTML error/SPA fallback
+      if (text.trim().startsWith('[') || text.trim().startsWith('{')) {
+        rawData = JSON.parse(text);
+        const backendHeader = response.headers.get('X-Powered-By-Backend');
+        if (backendHeader === 'express-local') {
+          detectedSource = 'Express Server (/api/sensor-data)';
+        } else if (backendHeader === 'netlify-function') {
+          detectedSource = 'Netlify Function';
+        } else {
+          detectedSource = 'Express Server (/api/sensor-data)';
+        }
+        fallbackActivated = false;
+      }
+    }
+  } catch (err) {
+    fetchError = err instanceof Error ? err : new Error(String(err));
+    console.warn('[fetchRecentSensorData] Primary proxy endpoint failed, attempting direct Google Apps Script fallback:', fetchError.message);
+  }
+
+  // Strategy 2: If proxy returned no valid JSON or failed, fetch directly from GOOGLE_SCRIPT_URL
+  if (!rawData && GOOGLE_SCRIPT_URL) {
+    try {
+      console.log('[fetchRecentSensorData] Fallback activated: fetching directly from Google Apps Script...');
+      const directResponse = await fetchWithTimeout(
+        `${GOOGLE_SCRIPT_URL}?sts=readrange${validCount}`,
+        { method: 'GET' },
+        25000
+      );
+      if (directResponse.ok) {
+        const text = await directResponse.text();
+        if (text.trim().startsWith('[') || text.trim().startsWith('{')) {
+          rawData = JSON.parse(text);
+          detectedSource = 'Direct Google Apps Script';
+          fallbackActivated = true;
+        }
+      }
+    } catch (directErr) {
+      console.error('[fetchRecentSensorData] Direct fetch also failed:', directErr);
+      fetchError = directErr instanceof Error ? directErr : new Error(String(directErr));
+    }
+  }
+
+  if (rawData) {
+    const validData = normalizeSensorPayload(rawData);
+    if (validData.length > 0) {
+      const latest = validData[validData.length - 1];
+      console.log(
+        `%c[SENSOR DATA TRACE]\n` +
+        `  • Source:              ${detectedSource}\n` +
+        `  • Record Timestamp:    ${latest.lastUpdated ?? 'N/A'}\n` +
+        `  • Temperature (DHT):   ${latest.temperature ?? 'N/A'} °C\n` +
+        `  • Humidity (DHT):      ${latest.humidity ?? 'N/A'} %\n` +
+        `  • PM2.5 (aqi25val):    ${latest.aqi25val ?? 'N/A'}\n` +
+        `  • PM10 (aqi10val):     ${latest.aqi10val ?? 'N/A'}\n` +
+        `  • Mock Mode Enabled:   ${USE_MOCK_DATA ? 'YES' : 'NO'}\n` +
+        `  • Fallback Activated:  ${fallbackActivated ? 'YES (Direct Apps Script Fallback)' : 'NO (Primary API succeeded)'}`,
+        'color: #0284c7; font-weight: bold;'
+      );
+      return validData;
+    }
+  }
+
+  // Never silently substitute mock data when the user requires genuine sensor data
+  throw new Error(`Failed to fetch recent sensor data: ${fetchError?.message || 'Empty or invalid response from sensors'}`);
+}
+
+/**
+ * Fetch only the latest sensor reading
+ * @returns {Promise<SensorData | null>} - Latest sensor data or null if none available
+ */
+export async function fetchLatestSensorData(): Promise<SensorData | null> {
+  const data = await fetchRecentSensorData(1);
+  return data.length > 0 ? data[data.length - 1] : null;
+}
+
+/**
+ * Fetch ALL historical sensor data using chunked requests of 2500 records at a time.
+ * Avoids Google Apps Script timeouts that occur with very large single requests.
  * @param {function} onProgress - Optional callback called after each chunk with running total
  * @returns {Promise<SensorData[]>} - All historical sensor records
  */
@@ -192,18 +266,18 @@ export async function fetchAllHistoricalData(
     return historicalDataCache;
   }
 
-  const CHUNK_SIZE = 2500;
-  const allData: SensorData[] = [];
-  const seen = new Set<string>();
-
   if (USE_MOCK_DATA) {
     console.log('[fetchAllHistoricalData] Using mock data');
     return generateHistoricalMockData(192);
   }
 
+  const CHUNK_SIZE = 2500;
+  const allData: SensorData[] = [];
+  const seen = new Set<string>();
+
   let hasMore = true;
   let attempt = 0;
-  const MAX_CHUNKS = 20; // safety cap: 20 × 5000 = 100 000 rows max
+  const MAX_CHUNKS = 20; // safety cap: 20 × 2500 = 50 000 rows max
 
   while (hasMore && attempt < MAX_CHUNKS) {
     attempt++;
@@ -211,17 +285,38 @@ export async function fetchAllHistoricalData(
     console.log(`[fetchAllHistoricalData] Fetching chunk ${attempt}: readrange${chunkCount}`);
 
     try {
-      const response = await fetchWithTimeout(`${API_URL}?sts=readrange${chunkCount}`, { method: 'GET' }, 35000);
+      let rawChunk: unknown = null;
+      let chunkSource = 'Primary Proxy';
 
-      if (!response.ok) {
-        console.warn(`[fetchAllHistoricalData] Chunk ${attempt} returned ${response.status}, stopping.`);
-        break;
+      // Strategy 1: Try proxy endpoint
+      try {
+        const response = await fetchWithTimeout(`${API_URL}?sts=readrange${chunkCount}`, { method: 'GET' }, 25000);
+        if (response.ok) {
+          const text = await response.text();
+          if (text.trim().startsWith('[')) {
+            rawChunk = JSON.parse(text);
+            const backendHdr = response.headers.get('X-Powered-By-Backend');
+            chunkSource = backendHdr === 'netlify-function' ? 'Netlify Function' : 'Express Server';
+          }
+        }
+      } catch {
+        // Fallback to direct Google Apps Script URL
+        if (GOOGLE_SCRIPT_URL) {
+          const directResp = await fetchWithTimeout(`${GOOGLE_SCRIPT_URL}?sts=readrange${chunkCount}`, { method: 'GET' }, 30000);
+          if (directResp.ok) {
+            const text = await directResp.text();
+            if (text.trim().startsWith('[')) {
+              rawChunk = JSON.parse(text);
+              chunkSource = 'Direct Google Apps Script (Fallback)';
+            }
+          }
+        }
       }
 
-      const data = await response.json();
-      if (!Array.isArray(data) || data.length === 0) break;
+      if (!rawChunk || !Array.isArray(rawChunk) || rawChunk.length === 0) break;
 
-      const valid = data.filter((item) => isValidSensorData(item));
+      const valid = normalizeSensorPayload(rawChunk);
+      console.log(`[fetchAllHistoricalData] Chunk ${attempt} loaded via ${chunkSource}: ${valid.length} records parsed`);
 
       // Add only new records (de-duplicate by lastUpdated)
       let newCount = 0;
@@ -237,8 +332,6 @@ export async function fetchAllHistoricalData(
       console.log(`[fetchAllHistoricalData] Chunk ${attempt}: got ${valid.length} valid, ${newCount} new. Total: ${allData.length}`);
       if (onProgress) onProgress(allData.length);
 
-      // If the API returned fewer than the total requested amount (chunkCount), 
-      // it means we've reached the end of the spreadsheet.
       if (valid.length < chunkCount) {
         hasMore = false;
         console.log('[fetchAllHistoricalData] Reached end of data.');
@@ -249,95 +342,26 @@ export async function fetchAllHistoricalData(
     }
   }
 
-  if (allData.length === 0 && import.meta.env.MODE === 'development') {
-    console.warn('[fetchAllHistoricalData] No data received — using mock fallback');
-    return generateHistoricalMockData(192);
+  if (allData.length === 0) {
+    throw new Error('No valid historical sensor data received from Google Sheets');
   }
 
   console.log(`[fetchAllHistoricalData] Done. Total records: ${allData.length}`);
-  
+
   // Update cache
   historicalDataCache = allData;
   lastCacheUpdate = Date.now();
-  
+
   return allData;
 }
 
 /**
- * Fetch most recent N rows of sensor data
- * Uses Apps Script "readrangeN" endpoint (e.g., readrange5 for last 5 rows)
- * Falls back to mock data in development when API is unavailable
- * @param {number} count - Number of recent rows to fetch
- * @returns {Promise<SensorData[]>} - Array of recent sensor data
- * @throws {Error} - If fetch fails and not in development mode
+ * Fetch all sensor data
  */
-export async function fetchRecentSensorData(count: number): Promise<SensorData[]> {
-  const validCount = Math.max(1, Math.floor(count));
-
-  try {
-    const response = await fetchWithTimeout(
-      `${API_URL}?sts=readrange${validCount}`,
-      {
-        method: 'GET',
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    if (!Array.isArray(data)) {
-      throw new Error('Expected array of sensor data');
-    }
-
-    // Validate data
-    const validData = data.filter((item) => {
-      if (!isValidSensorData(item)) {
-        console.warn('Invalid sensor data object:', item);
-        return false;
-      }
-      return true;
-    });
-
-    return validData;
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[fetchRecentSensorData] Error fetching recent sensor data:', errorMessage);
-    
-    // Development fallback
-    if (import.meta.env.MODE === 'development') {
-      console.warn('[fetchRecentSensorData] API unavailable - using mock data fallback');
-      return generateMockSensorData().slice(0, validCount);
-    }
-
-    throw new Error(`Failed to fetch recent sensor data: ${errorMessage}`);
+export async function fetchSensorData(): Promise<SensorData[]> {
+  if (USE_MOCK_DATA) {
+    console.log('[fetchSensorData] Using mock data for development');
+    return generateHistoricalMockData(192);
   }
-}
-
-/**
- * Fetch only the latest sensor reading
- * Falls back to mock data in development when API is unavailable
- * @returns {Promise<SensorData | null>} - Latest sensor data or null if none available
- * @throws {Error} - If fetch fails and not in development mode
- */
-export async function fetchLatestSensorData(): Promise<SensorData | null> {
-  try {
-    // Optimization: Fetch only the single most recent row instead of 100k rows
-    const data = await fetchRecentSensorData(1);
-    return data.length > 0 ? data[0] : null;
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[fetchLatestSensorData] Error fetching latest sensor data:', errorMessage);
-    
-    // Development fallback
-    if (USE_MOCK_DATA) {
-      console.warn('[fetchLatestSensorData] API unavailable - using mock data fallback');
-      const mockData = generateMockSensorData();
-      return mockData.length > 0 ? mockData[mockData.length - 1] : null;
-    }
-
-    throw new Error(`Failed to fetch latest sensor data: ${errorMessage}`);
-  }
+  return fetchAllHistoricalData();
 }

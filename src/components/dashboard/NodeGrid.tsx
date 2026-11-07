@@ -7,7 +7,6 @@ import {
   formatTemperatureWithBounds, 
   formatHumidityWithBounds, 
   formatPressureWithBounds, 
-  formatAQIWithBounds, 
   formatUVIndexWithBounds, 
   formatCoordinateCompact
 } from '../../utils/sensorFormatting';
@@ -143,7 +142,14 @@ const NodeCard: React.FC<NodeCardProps> = ({ node, isActive, onToggle }) => {
       {/* Expanded Content */}
       {isActive && (
         <div id={`node-content-${node.id}`} className="px-5 pb-6 space-y-5 animate-slide-up" style={{ animationDuration: '0.3s' }}>
-
+          {node.temperature === null && node.humidity === null && node.aqi25val === null ? (
+            <div className={`p-6 text-center rounded-xl border border-dashed my-2 ${darkMode ? 'border-slate-700 bg-slate-900/40 text-slate-400' : 'border-slate-300 bg-slate-50 text-slate-500'}`}>
+              <Server className="w-8 h-8 mx-auto mb-2 opacity-40" />
+              <p className="font-semibold text-sm">Node Hardware Pending Deployment</p>
+              <p className="text-xs mt-1">This node is reserved for future campus telemetry deployment.</p>
+            </div>
+          ) : (
+            <>
           {/* Node Information */}
           <div 
             className={`rounded-xl p-4 space-y-3 border ${darkMode ? 'bg-slate-900/50 border-slate-700/50' : 'bg-slate-50 border-slate-200'}`}
@@ -232,39 +238,39 @@ const NodeCard: React.FC<NodeCardProps> = ({ node, isActive, onToggle }) => {
                 <span className="text-xs font-semibold uppercase tracking-wider truncate">Rain Status</span>
               </div>
               <div className={`text-2xl font-bold capitalize ${darkMode ? 'text-white' : 'text-slate-900'} tracking-tight`}>
-                {node.rain?.toLowerCase() || 'N/A'}
+                {node.rain || 'N/A'}
               </div>
             </div>
 
-            {/* AQI 2.5 */}
+            {/* PM2.5 */}
             <div 
               className={`${darkMode ? 'bg-emerald-900/20 border-emerald-800/40' : 'bg-emerald-50 border-emerald-100'} rounded-xl p-4 border transition-colors duration-300 hover:bg-emerald-900/30`}
               role="group"
-              aria-label="PM2.5 air quality reading"
+              aria-label="PM2.5 particulate matter reading"
               tabIndex={0}
             >
               <div className={`flex items-center space-x-2.5 ${darkMode ? 'text-emerald-400' : 'text-emerald-600'} mb-2`}>
                 <Activity className="w-4 h-4 flex-shrink-0" />
-                <span className="text-xs font-semibold uppercase tracking-wider truncate">PM2.5 (AQI)</span>
+                <span className="text-xs font-semibold uppercase tracking-wider truncate">PM2.5</span>
               </div>
               <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'} tracking-tight`}>
-                {node.aqi25val !== undefined && node.aqi25val !== null ? formatAQIWithBounds(node.aqi25val) : 'N/A'}
+                {node.aqi25val !== undefined && node.aqi25val !== null ? `${node.aqi25val} µg/m³` : 'N/A'}
               </div>
             </div>
 
-            {/* AQI 10 */}
+            {/* PM10 */}
             <div 
               className={`${darkMode ? 'bg-amber-900/20 border-amber-800/40' : 'bg-amber-50 border-amber-100'} rounded-xl p-4 border transition-colors duration-300 hover:bg-amber-900/30`}
               role="group"
-              aria-label="PM10 air quality reading"
+              aria-label="PM10 particulate matter reading"
               tabIndex={0}
             >
               <div className={`flex items-center space-x-2.5 ${darkMode ? 'text-amber-400' : 'text-amber-600'} mb-2`}>
                 <Activity className="w-4 h-4 flex-shrink-0" />
-                <span className="text-xs font-semibold uppercase tracking-wider truncate">PM10 (AQI)</span>
+                <span className="text-xs font-semibold uppercase tracking-wider truncate">PM10</span>
               </div>
               <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'} tracking-tight`}>
-                {node.aqi10val !== undefined && node.aqi10val !== null ? formatAQIWithBounds(node.aqi10val) : 'N/A'}
+                {node.aqi10val !== undefined && node.aqi10val !== null ? `${node.aqi10val} µg/m³` : 'N/A'}
               </div>
             </div>
 
@@ -312,6 +318,8 @@ const NodeCard: React.FC<NodeCardProps> = ({ node, isActive, onToggle }) => {
               })() : <div className="text-2xl font-bold text-slate-500">N/A</div>}
             </div>
           </div>
+          </>
+          )}
         </div>
       )}
     </div>

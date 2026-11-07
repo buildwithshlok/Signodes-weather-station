@@ -4,15 +4,17 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev:frontend": "vite",
     "dev:mock": "VITE_USE_MOCK_DATA=true vite",
     "dev:backend": "node server.js",
-    "dev:full": "concurrently \"npm run dev\" \"npm run dev:backend\"",
+    "dev:full": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
     "dev:mobile": "concurrently \"vite --host\" \"npm run dev:backend\"",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc -b --noEmit",
+    "test": "node --test --experimental-strip-types tests/sensor-adaptation.test.js"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",

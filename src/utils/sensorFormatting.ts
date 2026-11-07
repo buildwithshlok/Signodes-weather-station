@@ -150,12 +150,25 @@ export function formatCOLevelWithBounds(co: number | undefined | null): string {
 }
 
 /**
- * Format AQI within realistic range (0-500)
- * @param aqi - AQI value
- * @returns Clamped and formatted AQI string
+ * Format Air Quality (PM2.5) within realistic range (0-800 µg/m³)
+ * @param val - PM2.5 value
+ * @returns Clamped and formatted string
  */
-export function formatAQIWithBounds(aqi: number | undefined | null): string {
-  if (aqi === undefined || aqi === null) return 'N/A';
-  const clamped = clampValue(aqi, 0, 500);
+export function formatAirQualityWithBounds(val: number | undefined | null): string {
+  if (val === undefined || val === null) return 'N/A';
+  const clamped = clampValue(val, 0, 800);
   return Math.round(clamped).toString();
+}
+
+export const formatAQIWithBounds = formatAirQualityWithBounds;
+
+/**
+ * Safely parse numeric sensor values, preserving 0 as 0 and returning null for missing/invalid data
+ */
+export function parseSensorNumber(val: unknown): number | null {
+  if (val === undefined || val === null) return null;
+  const str = String(val).trim();
+  if (str === '' || str === 'N/A' || str === 'null' || str === 'undefined') return null;
+  const num = parseFloat(str);
+  return isNaN(num) ? null : num;
 }

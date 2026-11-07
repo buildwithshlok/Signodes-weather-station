@@ -7,7 +7,7 @@ import { WavyBackground } from "../heroui/wavy-background";
 import { 
   formatTemperatureWithBounds, 
   formatHumidityWithBounds, 
-  formatAQIWithBounds, 
+  formatAirQualityWithBounds, 
   formatUVIndexWithBounds 
 } from '../../utils/sensorFormatting';
 
@@ -16,46 +16,41 @@ const EnvironmentalDashboard: React.FC = () => {
   const { darkMode } = useDarkMode();
   const nodeData = nodes.length > 0 ? nodes[0] : null;
 
-  // Helper function to calculate overall AQI from PM2.5 and PM10
-  const calculateOverallAQI = () => {
-    const pm25 = nodeData?.aqi25val || 0;
-    const pm10 = nodeData?.aqi10val || 0;
-    return Math.max(pm25, pm10);
-  };
+  // Primary air quality metric taken directly from genuine Google Sheets aqi25val
+  const pm25Value = nodeData?.aqi25val ?? 0;
 
-  // Helper function to get AQI color and status
-  const getAqiInfo = (aqi: number) => {
+  // Air quality category and styling for 0-800 µg/m³ range
+  const getAirQualityInfo = (val: number) => {
     if (darkMode) {
-      if (aqi <= 50) return { color: 'text-emerald-400', bgColor: 'bg-emerald-900/20 border-emerald-800/40', status: 'Good', description: 'Air quality is excellent' };
-      if (aqi <= 100) return { color: 'text-amber-400', bgColor: 'bg-amber-900/20 border-amber-800/40', status: 'Moderate', description: 'Air quality is acceptable' };
-      if (aqi <= 150) return { color: 'text-orange-400', bgColor: 'bg-orange-900/20 border-orange-800/40', status: 'Unhealthy for Sensitive Groups', description: 'Sensitive people may experience symptoms' };
-      if (aqi <= 200) return { color: 'text-rose-400', bgColor: 'bg-rose-900/20 border-rose-800/40', status: 'Unhealthy', description: 'Everyone may experience health effects' };
-      if (aqi <= 300) return { color: 'text-purple-400', bgColor: 'bg-purple-900/20 border-purple-800/40', status: 'Very Unhealthy', description: 'Health alert for everyone' };
-      return { color: 'text-red-500', bgColor: 'bg-red-900/30 border-red-800/50', status: 'Hazardous', description: 'Emergency conditions' };
+      if (val <= 30) return { color: 'text-emerald-400', bgColor: 'bg-emerald-900/20 border-emerald-800/40', status: 'Good' };
+      if (val <= 60) return { color: 'text-lime-400', bgColor: 'bg-lime-900/20 border-lime-800/40', status: 'Satisfactory' };
+      if (val <= 90) return { color: 'text-amber-400', bgColor: 'bg-amber-900/20 border-amber-800/40', status: 'Moderate' };
+      if (val <= 120) return { color: 'text-orange-400', bgColor: 'bg-orange-900/20 border-orange-800/40', status: 'Poor' };
+      if (val <= 250) return { color: 'text-red-400', bgColor: 'bg-red-900/20 border-red-800/40', status: 'Very Poor' };
+      return { color: 'text-rose-500', bgColor: 'bg-rose-900/30 border-rose-800/50', status: 'Severe' };
     } else {
-      if (aqi <= 50) return { color: 'text-emerald-600', bgColor: 'bg-emerald-50 border-emerald-200', status: 'Good', description: 'Air quality is excellent' };
-      if (aqi <= 100) return { color: 'text-amber-600', bgColor: 'bg-amber-50 border-amber-200', status: 'Moderate', description: 'Air quality is acceptable' };
-      if (aqi <= 150) return { color: 'text-orange-600', bgColor: 'bg-orange-50 border-orange-200', status: 'Unhealthy for Sensitive Groups', description: 'Sensitive people may experience symptoms' };
-      if (aqi <= 200) return { color: 'text-rose-600', bgColor: 'bg-rose-50 border-rose-200', status: 'Unhealthy', description: 'Everyone may experience health effects' };
-      if (aqi <= 300) return { color: 'text-purple-600', bgColor: 'bg-purple-50 border-purple-200', status: 'Very Unhealthy', description: 'Health alert for everyone' };
-      return { color: 'text-red-800', bgColor: 'bg-red-100 border-red-300', status: 'Hazardous', description: 'Emergency conditions' };
+      if (val <= 30) return { color: 'text-emerald-600', bgColor: 'bg-emerald-50 border-emerald-200', status: 'Good' };
+      if (val <= 60) return { color: 'text-lime-600', bgColor: 'bg-lime-50 border-lime-200', status: 'Satisfactory' };
+      if (val <= 90) return { color: 'text-amber-600', bgColor: 'bg-amber-50 border-amber-200', status: 'Moderate' };
+      if (val <= 120) return { color: 'text-orange-600', bgColor: 'bg-orange-50 border-orange-200', status: 'Poor' };
+      if (val <= 250) return { color: 'text-red-600', bgColor: 'bg-red-50 border-red-200', status: 'Very Poor' };
+      return { color: 'text-rose-800', bgColor: 'bg-rose-100 border-rose-300', status: 'Severe' };
     }
   };
 
-  const overallAQI = calculateOverallAQI();
-  const aqiInfo = getAqiInfo(overallAQI);
+  const aqiInfo = getAirQualityInfo(pm25Value);
 
   // Main dashboard data - 5 boxes
   const dashboardData = [
     {
-      name: 'AQI',
-      value: overallAQI > 0 ? formatAQIWithBounds(overallAQI) : 'N/A',
+      name: 'Air Quality',
+      value: nodeData?.aqi25val !== undefined && nodeData?.aqi25val !== null ? formatAirQualityWithBounds(nodeData.aqi25val) : 'N/A',
       description: aqiInfo.status,
-      unit: 'AQI',
+      unit: 'µg/m³',
       icon: Gauge,
       color: aqiInfo.color,
       bgColor: aqiInfo.bgColor,
-      range: '0-500'
+      range: '0-800'
     },
     {
       name: 'Temperature',
@@ -89,17 +84,25 @@ const EnvironmentalDashboard: React.FC = () => {
     },
     {
       name: 'Rain Status',
-      value: nodeData?.rain === 'Yes' ? 'Detected' : 'Clear',
-      description: 'Precipitation detection',
+      value: nodeData?.rain || 'Unknown',
+      description: 'Precipitation status',
       unit: '',
       icon: CloudRain,
-      color: nodeData?.rain === 'Yes' ? (darkMode ? 'text-indigo-400' : 'text-indigo-600') : (darkMode ? 'text-slate-400' : 'text-slate-500'),
-      bgColor: nodeData?.rain === 'Yes' ? (darkMode ? 'bg-indigo-900/20 border-indigo-800/40' : 'bg-indigo-50 border-indigo-200') : (darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-slate-50 border-slate-200'),
-      range: 'Yes/No'
-     }
+      color: (nodeData?.rain === 'Heavy Rain' || nodeData?.rain === 'Yes')
+        ? (darkMode ? 'text-indigo-400' : 'text-indigo-600')
+        : (nodeData?.rain === 'Light Rain')
+          ? (darkMode ? 'text-sky-400' : 'text-sky-600')
+          : (darkMode ? 'text-slate-400' : 'text-slate-500'),
+      bgColor: (nodeData?.rain === 'Heavy Rain' || nodeData?.rain === 'Yes')
+        ? (darkMode ? 'bg-indigo-900/20 border-indigo-800/40' : 'bg-indigo-50 border-indigo-200')
+        : (nodeData?.rain === 'Light Rain')
+          ? (darkMode ? 'bg-sky-900/20 border-sky-800/40' : 'bg-sky-50 border-sky-200')
+          : (darkMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-slate-50 border-slate-200'),
+      range: 'Estimated'
+    }
   ];
 
-  if (loading) {
+  if (loading && !nodeData) {
     return (
       <section 
         className="py-20 bg-gradient-to-br from-primary-900 via-primary-800 to-signodes-900"
@@ -202,7 +205,7 @@ const EnvironmentalDashboard: React.FC = () => {
                   
                   <div 
                     className={`text-2xl md:text-4xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'} mb-1 tracking-tight`}
-                    role={item.name === 'AQI' ? 'meter' : undefined}
+                    role={item.name === 'Air Quality' ? 'meter' : undefined}
                     aria-valuetext={`${item.value}${item.unit}`}
                     aria-label={`${item.name}: ${item.value}${item.unit}`}
                   >
@@ -210,7 +213,7 @@ const EnvironmentalDashboard: React.FC = () => {
                     {item.unit && <span className={`text-lg ml-1 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>{item.unit}</span>}
                   </div>
                   
-                  <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'} mb-4 line-clamp-1`}>{item.description}</p>
+                  <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'} mb-4 truncate`} title={item.description}>{item.description}</p>
                   
                   <div className="pt-4 border-t border-slate-200 dark:border-slate-700/50 flex justify-between items-center mt-auto">
                     <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'} font-medium`}>

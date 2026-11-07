@@ -28,6 +28,14 @@ function getAllowedOrigin(origin) {
   return ALLOWED_ORIGINS.includes(origin) ? origin : undefined;
 }
 
+function parseSensorNumber(val) {
+  if (val === undefined || val === null) return null;
+  const str = val.toString().trim();
+  if (str === '' || str === 'N/A' || str === 'null' || str === 'undefined') return null;
+  const num = parseFloat(str);
+  return isNaN(num) ? null : num;
+}
+
 /**
  * Parse sensor data from JSON or CSV format
  * @param {string} textData - Raw data from Google Apps Script
@@ -51,17 +59,19 @@ function parseSensorData(textData) {
               id: `node-${idx + 1}`,
               name: 'Node A',
               location: 'Main Campus',
-              latitude: parseFloat(row[7]?.toString().trim()) || 0,
-              longitude: parseFloat(row[8]?.toString().trim()) || 0,
-              temperature: parseFloat(row[2]?.toString().trim()) || 0,
-              pressure: parseFloat(row[1]?.toString().trim()) || 0,
-              humidity: parseFloat(row[3]?.toString().trim()) || 0,
-              aqi25val: parseFloat(row[6]?.toString().trim()) || 0,
-              aqi10val: parseFloat(row[5]?.toString().trim()) || 0,
-              uvIndex: parseFloat(row[14]?.toString().trim()) || 0,
-              uvRisk: row[15]?.toString().trim() || getUVRisk(parseFloat(row[14]) || 0),
+              latitude: parseSensorNumber(row[7]),
+              longitude: parseSensorNumber(row[8]),
+              temperature: parseSensorNumber(row[4]), // DHTtemp_C (switched from damaged BMP row[2])
+              dht_temperature: parseSensorNumber(row[4]),
+              bmp_temperature: parseSensorNumber(row[2]),
+              pressure: parseSensorNumber(row[1]),
+              humidity: parseSensorNumber(row[3]),
+              aqi25val: parseSensorNumber(row[6]),
+              aqi10val: parseSensorNumber(row[5]),
+              uvIndex: parseSensorNumber(row[14]),
+              uvRisk: row[15]?.toString().trim() || getUVRisk(parseSensorNumber(row[14]) ?? 0),
               rain: row[13]?.toString().trim() === 'Yes' ? 'Yes' : 'No',
-              mq_co: parseFloat(row[10]?.toString().trim()) || 0,
+              mq_co: parseSensorNumber(row[10]),
               lastUpdated: row[0]?.toString().trim() || new Date().toISOString(),
             };
           }).filter(item => item !== null);
@@ -89,17 +99,19 @@ function parseSensorData(textData) {
             id: `node-${index + 1}`,
             name: 'Node A',
             location: 'Main Campus',
-            latitude: parseFloat(columns[7]?.trim()) || 0,
-            longitude: parseFloat(columns[8]?.trim()) || 0,
-            temperature: parseFloat(columns[2]?.trim()) || 0,
-            pressure: parseFloat(columns[1]?.trim()) || 0,
-            humidity: parseFloat(columns[3]?.trim()) || 0,
-            aqi25val: parseFloat(columns[6]?.trim()) || 0,
-            aqi10val: parseFloat(columns[5]?.trim()) || 0,
-            uvIndex: parseFloat(columns[14]?.trim()) || 0,
-            uvRisk: columns[15]?.trim() || getUVRisk(parseFloat(columns[14]?.trim()) || 0),
+            latitude: parseSensorNumber(columns[7]),
+            longitude: parseSensorNumber(columns[8]),
+            temperature: parseSensorNumber(columns[4]), // DHTtemp_C (switched from damaged BMP columns[2])
+            dht_temperature: parseSensorNumber(columns[4]),
+            bmp_temperature: parseSensorNumber(columns[2]),
+            pressure: parseSensorNumber(columns[1]),
+            humidity: parseSensorNumber(columns[3]),
+            aqi25val: parseSensorNumber(columns[6]),
+            aqi10val: parseSensorNumber(columns[5]),
+            uvIndex: parseSensorNumber(columns[14]),
+            uvRisk: columns[15]?.trim() || getUVRisk(parseSensorNumber(columns[14]) ?? 0),
             rain: columns[13]?.trim() === 'Yes' ? 'Yes' : 'No',
-            mq_co: parseFloat(columns[10]?.trim()) || 0,
+            mq_co: parseSensorNumber(columns[10]),
             lastUpdated: columns[0]?.trim() || new Date().toISOString(),
           };
         } catch (e) {
@@ -120,6 +132,7 @@ exports.handler = async (event, context) => {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Headers': 'Content-Type, Accept',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'X-Powered-By-Backend': 'netlify-function',
   };
   if (origin) {
     responseHeaders['Access-Control-Allow-Origin'] = origin;
@@ -221,3 +234,7 @@ exports.handler = async (event, context) => {
     };
   }
 };
+
+exports.parseSensorData = parseSensorData;
+exports.parseSensorNumber = parseSensorNumber;
+exports.getUVRisk = getUVRisk;

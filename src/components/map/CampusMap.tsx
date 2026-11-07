@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNodes } from '../../context/NodesContext';
 import { Thermometer, Droplets, Wind, Gauge, CloudRain, Sun, Zap } from 'lucide-react';
-import { calibrateAQI, getAQICategory, coToPollutionPercent, getCOPollutionCategory } from '../../utils/sensorCalibration';
+import { getAQICategory, coToPollutionPercent, getCOPollutionCategory } from '../../utils/sensorCalibration';
 import { useDarkMode } from '../../context/DarkModeContext';
 
 interface NodeData {
@@ -65,8 +65,6 @@ const CampusMap: React.FC = () => {
         rain: node.rain || 'No',
         aqi25val: String(node.aqi25val || 'N/A'),
         aqi10val: String(node.aqi10val || 'N/A'),
-        // Calculate calibrated AQI
-        aqi: String(calibrateAQI(Number(node.aqi25val || 0), Number(node.aqi10val || 0))),
         uvIndex: String(node.uvIndex || 'N/A'),
         uvRisk: node.uvRisk || 'N/A',
         // SensorData may not include windSpeed; access defensively
@@ -306,7 +304,7 @@ const CampusMap: React.FC = () => {
                   <div className={`flex items-center justify-between p-3 rounded-xl border ${darkMode ? 'bg-indigo-900/10 border-indigo-800/30' : 'bg-indigo-50 border-indigo-100'}`} role="group" aria-label="Rain status">
                     <div className="flex items-center space-x-3">
                       <CloudRain className={`w-5 h-5 ${darkMode ? 'text-indigo-400' : 'text-indigo-600'}`} />
-                      <span className={`text-sm font-semibold uppercase tracking-wider ${darkMode ? 'text-indigo-400' : 'text-indigo-700'}`}>Rain Status</span>
+                      <span className={`text-sm font-semibold uppercase tracking-wider block ${darkMode ? 'text-indigo-400' : 'text-indigo-700'}`}>Rain Status</span>
                     </div>
                     <span className={`text-lg font-bold tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                       {selectedNode.rain}
