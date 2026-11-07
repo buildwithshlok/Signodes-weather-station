@@ -1,262 +1,394 @@
-# NIET Weather Station
+# 🌦️ NIET Smart Weather Station
 
-A professional-grade, real-time weather monitoring dashboard for NIET campus that displays sensor data from IoT devices with enterprise-level security and reliability.
+<img width="1439" height="691" alt="image" src="https://github.com/user-attachments/assets/ec3a26ea-ee60-4fa1-a319-792f971f05f2" />
 
-## Features
 
-- **Real-time Monitoring**: Live weather data from campus sensors with 5-minute polling
-- **Multi-Sensor Support**: Temperature, humidity, pressure, air quality (PM2.5, PM10), UV index, carbon monoxide, and rainfall
-- **Dark Mode**: Full dark/light theme support with system preference detection
-- **Responsive Design**: Optimized for desktop, tablet, and mobile devices
-- **Node Status Monitoring**: Online/offline status detection for each sensor node
-- **Network Resilience**: Automatic retry and timeout handling for API calls
-- **Type-Safe**: Full TypeScript implementation with strict type checking
-- **Data Validation**: Server-side and client-side data validation
-- **Security**: CORS protection, environment variable configuration, no sensitive data logging
+<p align="center">
+  <strong>Campus-Scale IoT Weather Monitoring System</strong><br>
+  Real-Time Environmental Monitoring • IoT Sensors • Cloud Integration • Interactive Dashboard
+</p>
 
-## Quick Start
+---
 
-### Prerequisites
+## 🚀 Live Deployment
 
-- Node.js 18+ and npm 9+
-- Google Apps Script with sensor data endpoint (URL provided)
+🔗 **Dashboard:** https://signodes-weather-window.netlify.app
 
-### Installation
+Access the real-time weather monitoring dashboard to view live environmental data collected from NIET campus sensor nodes.
 
-1. **Clone and install dependencies**
-   ```bash
-   npm install
-   ```
 
-2. **Configure environment variables**
-   ```bash
-   cp .env.example .env
-   ```
-   
-   Edit `.env` and add your Google Apps Script URL:
-   ```env
-   VITE_GOOGLE_SCRIPT_URL=https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec
-   ```
 
-3. **Start development server**
-   ```bash
-   npm run dev
-   ```
-   The app will be available at `http://localhost:5173`
+## 📖 Overview
 
-4. **Build for production**
-   ```bash
-   npm run build
-   ```
+The **NIET Smart Weather Station** is a campus-wide IoT-based environmental monitoring system designed to collect, process, and visualize real-time weather data from distributed sensor nodes across the NIET campus.
 
-## Environment Configuration
+The project integrates **embedded hardware, cloud services, and a modern web dashboard** to provide accurate and continuous monitoring of environmental conditions such as temperature, humidity, atmospheric pressure, air quality, UV index, carbon monoxide levels, and rainfall status.
 
-### Required Variables
+This project demonstrates the seamless integration of **IoT, Embedded Systems, Cloud Computing, and Full-Stack Web Development** into a single smart infrastructure solution.
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `VITE_GOOGLE_SCRIPT_URL` | Google Apps Script API endpoint | `https://script.google.com/macros/s/ABC123/exec` |
+---
 
-### Optional Variables (Backend Server)
+## 🚀 Key Features
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PORT` | Backend server port | `3002` |
-| `NODE_ENV` | Environment (development/production) | `development` |
-| `ALLOWED_ORIGINS` | Comma-separated CORS origins | (auto-configured in dev) |
+### 📡 Real-Time Monitoring
 
-### Example .env for Development
+* Live weather updates from deployed sensor nodes
+* Automatic data refresh every 5 minutes
+* Continuous environmental tracking
 
-```env
-VITE_GOOGLE_SCRIPT_URL=https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec
-NODE_ENV=development
+### 🌍 Multi-Sensor Data Collection
+
+* Temperature Monitoring
+* Humidity Monitoring
+* Atmospheric Pressure Monitoring
+* PM2.5 Air Quality Monitoring
+* PM10 Air Quality Monitoring
+* UV Index Measurement
+* Carbon Monoxide Detection
+* Rainfall Detection
+
+### 📊 Interactive Dashboard
+
+* Clean and responsive user interface
+* Dark Mode / Light Mode support
+* Mobile, Tablet, and Desktop compatibility
+* Real-time visualization of environmental parameters
+
+### 🔗 Smart Node Management
+
+* Online/Offline Node Status Detection
+* Last Active Timestamp Tracking
+* Network Health Monitoring
+
+### 🛡️ Reliability & Security
+
+* Type-Safe Architecture using TypeScript
+* Environment-Based Configuration
+* CORS Protection
+* Data Validation
+* Automatic Retry Mechanism
+* Request Timeout Handling
+
+---
+
+# 🏗️ System Architecture
+
+```text
+┌───────────────────┐
+│ Environmental     │
+│ Sensors           │
+└─────────┬─────────┘
+          │
+          ▼
+┌───────────────────┐
+│ ESP8266 / ESP32   │
+│ Sensor Nodes      │
+└─────────┬─────────┘
+          │ WiFi
+          ▼
+┌───────────────────┐
+│ Google Apps Script│
+│ API Layer         │
+└─────────┬─────────┘
+          │
+          ▼
+┌───────────────────┐
+│ Google Sheets     │
+│ Data Storage      │
+└─────────┬─────────┘
+          │
+          ▼
+┌───────────────────┐
+│ React Dashboard   │
+│ Visualization     │
+└─────────┬─────────┘
+          │
+          ▼
+┌───────────────────┐
+│ End Users         │
+└───────────────────┘
 ```
 
-### Example .env for Production
+---
 
-```env
-VITE_GOOGLE_SCRIPT_URL=https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec
-NODE_ENV=production
-ALLOWED_ORIGINS=https://weather.example.com,https://app.example.com
-PORT=3002
-```
+# 🔌 Hardware Components
 
-## Project Structure
+| Component           | Purpose                           |
+| ------------------- | --------------------------------- |
+| ESP8266 / ESP32     | Main Microcontroller              |
+| DHT22               | Temperature & Humidity Monitoring |
+| BMP280              | Atmospheric Pressure Monitoring   |
+| MQ Series Sensor    | Air Quality & Gas Detection       |
+| UV Sensor           | UV Index Monitoring               |
+| Rain Sensor         | Rainfall Detection                |
+| WiFi Module         | Wireless Data Transmission        |
+| Power Supply Module | Stable Power Management           |
 
-```
+---
+
+# 📊 Parameters Monitored
+
+| Parameter            | Unit     |
+| -------------------- | -------- |
+| Temperature          | °C       |
+| Humidity             | %        |
+| Atmospheric Pressure | hPa      |
+| PM2.5                | µg/m³    |
+| PM10                 | µg/m³    |
+| UV Index             | Index    |
+| Carbon Monoxide      | ppm      |
+| Rainfall Status      | Yes / No |
+
+---
+
+# 💻 Technology Stack
+
+## Frontend
+
+* React.js
+* TypeScript
+* Vite
+* Tailwind CSS
+* Context API
+
+## Backend
+
+* Node.js
+* Express.js
+* Google Apps Script
+
+## Database
+
+* Google Sheets
+
+## IoT Layer
+
+* ESP8266 / ESP32
+* Embedded C++
+* WiFi Communication
+
+---
+
+# 📂 Project Structure
+
+```text
 src/
-├── components/          # React components
-│   ├── common/         # Shared components (Header, Footer, ErrorBoundary)
-│   ├── dashboard/      # Dashboard components
-│   ├── analytics/      # Analytics and data visualization
-│   ├── map/           # Campus map visualization
-│   └── heroui/        # UI effects and animations
-├── context/            # React Context (Dark Mode, Nodes data)
-├── pages/             # Page components (Home, Dashboard)
-├── services/          # API services (Google Sheets integration)
-├── config/            # Configuration files
-├── utils/             # Utility functions (date formatting, etc.)
-├── hooks/             # Custom React hooks
-└── lib/               # Library-specific code
+├── components/
+│   ├── common/
+│   ├── dashboard/
+│   ├── analytics/
+│   ├── map/
+│   └── heroui/
+│
+├── context/
+├── pages/
+├── services/
+├── config/
+├── utils/
+├── hooks/
+└── lib/
 ```
 
-## API Integration
+---
 
-### Data Format
+# 📈 Dashboard Features
 
-The application expects sensor data in the following format:
+### Weather Monitoring
 
-```json
-{
-  "id": "node-1",
-  "name": "Node A",
-  "location": "Block A",
-  "latitude": 28.7041,
-  "longitude": 77.1025,
-  "temperature": 28.5,
-  "pressure": 1013.25,
-  "humidity": 65,
-  "aqi25val": 45,
-  "aqi10val": 38,
-  "uvIndex": 6,
-  "uvRisk": "High",
-  "rain": "No",
-  "mq_co": 0.8,
-  "lastUpdated": "2025-02-26T10:30:00Z"
-}
+* Live Temperature Tracking
+* Live Humidity Tracking
+* Atmospheric Pressure Visualization
+* Rainfall Status Monitoring
+
+### Air Quality Analytics
+
+* PM2.5 Monitoring
+* PM10 Monitoring
+* Carbon Monoxide Detection
+* UV Risk Analysis
+
+### Smart Visualization
+
+* Interactive UI Components
+* Real-Time Data Representation
+* Responsive Analytics Dashboard
+
+### Device Monitoring
+
+* Node Status Monitoring
+* Last Updated Tracking
+* Connection Health Monitoring
+
+---
+
+# 🔄 Data Flow
+
+```text
+Sensor Reading
+      ↓
+Data Processing
+      ↓
+WiFi Transmission
+      ↓
+Google Apps Script API
+      ↓
+Google Sheets Storage
+      ↓
+Dashboard Data Fetching
+      ↓
+Real-Time Visualization
 ```
 
-### Data Update Interval
+---
 
-- **Default**: 5 minutes (300,000 ms)
-- **Configurable**: Edit `src/context/NodesContext.tsx` line 87
-- **Offline threshold**: 15 minutes (3x update interval)
+# ⚡ Performance
 
-## Deployment
+| Metric                | Value             |
+| --------------------- | ----------------- |
+| Data Refresh Interval | 5 Minutes         |
+| Dashboard Load Time   | < 2 Seconds       |
+| Update Frequency      | Real-Time Polling |
+| Platform Availability | 24×7 Monitoring   |
 
-### Netlify
+---
 
-The project is configured for Netlify deployment with serverless functions.
+# 🛠️ Installation
 
-1. **Configure environment variables** in Netlify dashboard:
-   - `GOOGLE_SCRIPT_URL`
-   - `ALLOWED_ORIGINS` (optional)
-
-2. **Deploy**
-   ```bash
-   npm run build
-   netlify deploy --prod
-   ```
-
-### Vercel / Other Platforms
-
-Update the `vite.config.ts` proxy configuration and environment variables as needed.
-
-## Development
-
-### Scripts
+## Clone Repository
 
 ```bash
-npm run dev        # Start development server
-npm run build      # Build for production
-npm run lint       # Run ESLint
-npm run preview    # Preview production build
+git clone https://github.com/buildwithshlok/NIET-Weather-Station.git
+
+cd NIET-Weather-Station
 ```
 
-### TypeScript
-
-All code is written in TypeScript with strict mode enabled. Run type checking:
+## Install Dependencies
 
 ```bash
-npx tsc --noEmit
+npm install
 ```
 
-### Code Quality
+## Configure Environment Variables
 
-- **ESLint**: Configuration in `eslint.config.js`
-- **Tailwind CSS**: Styling framework with custom configuration
-- **React Hooks**: Optimized for performance with proper dependencies
+Create a `.env` file:
 
-## Security Considerations
+```env
+VITE_GOOGLE_SCRIPT_URL=YOUR_GOOGLE_SCRIPT_URL
+```
 
-### CORS Policy
+## Start Development Server
 
-- ✅ Strict origin validation (no wildcard `*`)
-- ✅ Specific domain whitelist in production
-- ✅ Automatic localhost support in development
-- ✅ CORS preflight request handling
+```bash
+npm run dev
+```
 
-### Sensitive Data
+Application will be available at:
 
-- ✅ No sensitive URLs logged to console
-- ✅ Error messages sanitized in production
-- ✅ Environment variables not exposed to client
-- ✅ Request timeouts prevent hanging
+```text
+http://localhost:5173
+```
 
-### Data Validation
+---
 
-- ✅ Server-side validation of sensor data
-- ✅ Type-safe API responses
-- ✅ Graceful error handling
+# 🚀 Production Build
 
-## Troubleshooting
+```bash
+npm run build
+```
 
-### Camera/Google API Issues
+Preview Production Build:
 
-**Problem**: "VITE_GOOGLE_SCRIPT_URL not configured"
+```bash
+npm run preview
+```
 
-**Solution**: 
-- Copy `.env.example` to `.env`
-- Add your Google Apps Script URL from Google Cloud Console
-- Restart the development server
+---
 
-### Sensor Data Not Loading
+# 📷 Project Gallery
 
-**Problem**: Dashboard shows "No data available"
+### Dashboard
 
-**Solution**:
-1. Check that Google Apps Script URL is valid
-2. Verify sensor data is present in Google Sheets
-3. Check browser console for errors
-4. Ensure CORS is properly configured
 
-### Timeout Errors
+<img width="1873" height="788" alt="image" src="https://github.com/user-attachments/assets/854b28ab-d216-431f-b98c-3cb9712545c3" />
 
-**Problem**: "Data fetching timeout"
 
-**Solution**:
-- Check internet connection
-- Verify Google Apps Script endpoint is responding
-- Increase timeout in `src/services/googleSheetsService.ts` (line 35)
 
-## Performance
+### Hardware Node
 
-- **Bundle Size**: ~45KB gzipped (production)
-- **First Contentful Paint**: <2s on 4G
-- **Polling Efficiency**: 5-minute intervals with smart caching
-- **Memory**: Optimized with React.memo and useCallback
 
-## Browser Support
 
-- Chrome/Edge: Latest 2 versions
-- Firefox: Latest 2 versions
-- Safari: Latest 2 versions
-- Mobile: iOS 12+, Android 8+
+<img width="1936" height="1352" alt="image" src="https://github.com/user-attachments/assets/23c94602-6c44-4e8a-aa76-a20c252ed83a" />
 
-## License
 
-[Add your license here]
 
-## Contributing
+### Deployment Site
 
-1. Create feature branch (`git checkout -b feature/amazing-feature`)
-2. Commit changes (`git commit -m 'Add amazing feature'`)
-3. Push to branch (`git push origin feature/amazing-feature`)
-4. Open Pull Request
 
-## Support
+<img width="1873" height="788" alt="image" src="https://github.com/user-attachments/assets/0db0d57d-3a56-4589-85f5-c996cd5cfc12" />
 
-For issues and questions:
-- Create an issue on GitHub
-- Check existing documentation
-- Review error logs in browser console
+
+---
+
+# 🎯 Applications
+
+* Smart Campus Infrastructure
+* Environmental Monitoring
+* Research & Data Analytics
+* Pollution Tracking
+* Smart City Solutions
+* Educational IoT Demonstrations
+* Weather Forecasting Research
+
+---
+
+# 🔮 Future Scope
+
+* AI-Based Weather Prediction
+* Historical Data Analytics
+* Mobile Application Development
+* SMS & Email Alerts
+* MQTT-Based Communication
+* Cloud Database Integration
+* Machine Learning Forecast Models
+
+---
+
+# 👨‍💻 Developer
+
+### Shlok Singh
+
+Third-Year Engineering Student
+
+**Domains Worked On**
+
+* Internet of Things (IoT)
+* Embedded Systems
+* Full Stack Development
+* Cloud Integration
+* Environmental Monitoring Systems
+
+---
+
+# 🏆 Project Highlights
+
+✅ End-to-End IoT Solution
+
+✅ Hardware + Software Integration
+
+✅ Real-Time Environmental Monitoring
+
+✅ Cloud-Based Data Processing
+
+✅ Interactive Analytics Dashboard
+
+✅ Campus-Wide Deployment
+
+✅ Research-Oriented Engineering Project
+
+---
+
+## ⭐ Support
+
+If you found this project useful, consider giving it a **Star ⭐** on GitHub.
+
+Your support motivates further development and improvements.
