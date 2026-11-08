@@ -32,7 +32,7 @@ export const SensorDataSchema = z.object({
 export type SensorData = z.infer<typeof SensorDataSchema>;
 
 // API Configuration
-const API_URL = `${API_BASE}`;
+const API_URL = typeof window !== 'undefined' ? API_BASE : `http://localhost:3002${API_BASE}`;
 const REQUEST_TIMEOUT = 30000; // 30 seconds
 
 const metaEnv = (import.meta as unknown as { env?: Record<string, string> }).env;
@@ -45,6 +45,18 @@ const USE_MOCK_DATA = Boolean(isDevMode && isMockForced);
 let historicalDataCache: SensorData[] | null = null;
 let lastCacheUpdate: number = 0;
 const CACHE_TTL = 15 * 60 * 1000; // 15 minutes cache (synced with hardware cycle)
+let inFlightHistoricalRequest: Promise<SensorData[]> | null = null;
+let inFlightRequestCount = 0;
+
+/**
+ * Clear historical data cache (useful for testing or forced refetch)
+ */
+export function clearHistoricalCache(): void {
+  historicalDataCache = null;
+  lastCacheUpdate = 0;
+  inFlightHistoricalRequest = null;
+  inFlightRequestCount = 0;
+}
 
 /**
  * Fetch request with timeout
@@ -250,109 +262,141 @@ export async function fetchLatestSensorData(): Promise<SensorData | null> {
 }
 
 /**
- * Fetch ALL historical sensor data using chunked requests of 2500 records at a time.
- * Avoids Google Apps Script timeouts that occur with very large single requests.
- * @param {function} onProgress - Optional callback called after each chunk with running total
- * @returns {Promise<SensorData[]>} - All historical sensor records
+ * Fetch historical sensor data with optimized single-query retrieval,
+ * in-flight request deduplication, chronological sorting, and tiered memory caching.
+ *
+ * @param count - Target number of rows to retrieve (default: 30000, covers full sheet history).
+ * @param onProgress - Optional callback for tracking progress.
+ * @param forceRefresh - If true, bypasses the memory cache.
+ * @param signal - Optional AbortSignal to cancel obsolete requests.
  */
-export async function fetchAllHistoricalData(
-  onProgress?: (loaded: number) => void
+export async function fetchHistoricalData(
+  count: number = 30000,
+  onProgress?: (loaded: number) => void,
+  forceRefresh: boolean = false,
+  signal?: AbortSignal
 ): Promise<SensorData[]> {
-  // Check cache first
+  const targetCount = Math.max(100, Math.floor(count));
+
+  // 1. Check cache: return if cache is fresh and satisfies requested count
   const now = Date.now();
-  if (historicalDataCache && (now - lastCacheUpdate < CACHE_TTL)) {
-    console.log('[fetchAllHistoricalData] Returning cached data');
+  if (
+    !forceRefresh &&
+    historicalDataCache &&
+    historicalDataCache.length >= targetCount &&
+    now - lastCacheUpdate < CACHE_TTL
+  ) {
     if (onProgress) onProgress(historicalDataCache.length);
     return historicalDataCache;
   }
 
-  if (USE_MOCK_DATA) {
-    console.log('[fetchAllHistoricalData] Using mock data');
-    return generateHistoricalMockData(192);
+  // 2. Return in-flight request if one is already running with sufficient coverage
+  if (inFlightHistoricalRequest && inFlightRequestCount >= targetCount && !forceRefresh) {
+    return inFlightHistoricalRequest;
   }
 
-  const CHUNK_SIZE = 2500;
-  const allData: SensorData[] = [];
-  const seen = new Set<string>();
+  // 3. Mock data check (only when explicitly enabled)
+  if (USE_MOCK_DATA) {
+    const mock = generateHistoricalMockData(Math.min(90, Math.ceil(targetCount / 96)));
+    historicalDataCache = mock;
+    lastCacheUpdate = Date.now();
+    return mock;
+  }
 
-  let hasMore = true;
-  let attempt = 0;
-  const MAX_CHUNKS = 20; // safety cap: 20 × 2500 = 50 000 rows max
+  // Set timeout based on query size (allow up to 35s for large datasets)
+  const reqTimeout = targetCount > 5000 ? 35000 : 25000;
 
-  while (hasMore && attempt < MAX_CHUNKS) {
-    attempt++;
-    const chunkCount = CHUNK_SIZE * attempt;
-    console.log(`[fetchAllHistoricalData] Fetching chunk ${attempt}: readrange${chunkCount}`);
-
+  inFlightRequestCount = targetCount;
+  inFlightHistoricalRequest = (async () => {
     try {
-      let rawChunk: unknown = null;
-      let chunkSource = 'Primary Proxy';
+      if (signal?.aborted) {
+        throw new Error('Request aborted');
+      }
+
+      let rawData: unknown = null;
+      let source = 'Primary API';
 
       // Strategy 1: Try proxy endpoint
       try {
-        const response = await fetchWithTimeout(`${API_URL}?sts=readrange${chunkCount}`, { method: 'GET' }, 25000);
+        const response = await fetchWithTimeout(
+          `${API_URL}?sts=readrange${targetCount}`,
+          { method: 'GET', signal },
+          reqTimeout
+        );
         if (response.ok) {
           const text = await response.text();
           if (text.trim().startsWith('[')) {
-            rawChunk = JSON.parse(text);
+            rawData = JSON.parse(text);
             const backendHdr = response.headers.get('X-Powered-By-Backend');
-            chunkSource = backendHdr === 'netlify-function' ? 'Netlify Function' : 'Express Server';
+            source = backendHdr === 'netlify-function' ? 'Netlify Function' : 'Express Server';
           }
         }
-      } catch {
-        // Fallback to direct Google Apps Script URL
-        if (GOOGLE_SCRIPT_URL) {
-          const directResp = await fetchWithTimeout(`${GOOGLE_SCRIPT_URL}?sts=readrange${chunkCount}`, { method: 'GET' }, 30000);
-          if (directResp.ok) {
-            const text = await directResp.text();
-            if (text.trim().startsWith('[')) {
-              rawChunk = JSON.parse(text);
-              chunkSource = 'Direct Google Apps Script (Fallback)';
-            }
+      } catch (proxyErr) {
+        if (signal?.aborted) throw proxyErr;
+        console.warn('[fetchHistoricalData] Proxy failed, falling back to direct Google Apps Script:', proxyErr);
+      }
+
+      // Strategy 2: Direct Google Apps Script fallback
+      if (!rawData && GOOGLE_SCRIPT_URL) {
+        if (signal?.aborted) {
+          throw new Error('Request aborted');
+        }
+        const directResp = await fetchWithTimeout(
+          `${GOOGLE_SCRIPT_URL}?sts=readrange${targetCount}`,
+          { method: 'GET', signal },
+          reqTimeout
+        );
+        if (directResp.ok) {
+          const text = await directResp.text();
+          if (text.trim().startsWith('[')) {
+            rawData = JSON.parse(text);
+            source = 'Direct Google Apps Script (Fallback)';
           }
         }
       }
 
-      if (!rawChunk || !Array.isArray(rawChunk) || rawChunk.length === 0) break;
-
-      const valid = normalizeSensorPayload(rawChunk);
-      console.log(`[fetchAllHistoricalData] Chunk ${attempt} loaded via ${chunkSource}: ${valid.length} records parsed`);
-
-      // Add only new records (de-duplicate by lastUpdated)
-      let newCount = 0;
-      for (const row of valid) {
-        const key = row.lastUpdated ?? '';
-        if (!seen.has(key)) {
-          seen.add(key);
-          allData.push(row);
-          newCount++;
-        }
+      if (!rawData || !Array.isArray(rawData) || rawData.length === 0) {
+        throw new Error('No historical sensor data received from Google Sheets');
       }
 
-      console.log(`[fetchAllHistoricalData] Chunk ${attempt}: got ${valid.length} valid, ${newCount} new. Total: ${allData.length}`);
-      if (onProgress) onProgress(allData.length);
-
-      if (valid.length < chunkCount) {
-        hasMore = false;
-        console.log('[fetchAllHistoricalData] Reached end of data.');
+      const valid = normalizeSensorPayload(rawData);
+      if (valid.length === 0) {
+        throw new Error('Historical data was received but contained no valid sensor records');
       }
-    } catch (err) {
-      console.error(`[fetchAllHistoricalData] Chunk ${attempt} failed:`, err);
-      break;
+
+      // Chronological sort: earliest to newest
+      valid.sort((a, b) => {
+        const tA = new Date(String(a.lastUpdated).replace('_', 'T')).getTime() || 0;
+        const tB = new Date(String(b.lastUpdated).replace('_', 'T')).getTime() || 0;
+        return tA - tB;
+      });
+
+      console.log(`[fetchHistoricalData] Successfully loaded ${valid.length} genuine records via ${source}`);
+      if (onProgress) onProgress(valid.length);
+
+      // Cache result if larger than existing cache
+      if (!historicalDataCache || valid.length >= historicalDataCache.length) {
+        historicalDataCache = valid;
+        lastCacheUpdate = Date.now();
+      }
+      return valid;
+    } finally {
+      inFlightHistoricalRequest = null;
+      inFlightRequestCount = 0;
     }
-  }
+  })();
 
-  if (allData.length === 0) {
-    throw new Error('No valid historical sensor data received from Google Sheets');
-  }
+  return inFlightHistoricalRequest;
+}
 
-  console.log(`[fetchAllHistoricalData] Done. Total records: ${allData.length}`);
-
-  // Update cache
-  historicalDataCache = allData;
-  lastCacheUpdate = Date.now();
-
-  return allData;
+/**
+ * Fetch ALL historical sensor data.
+ * Retrieves all available historical records (default 30,000 rows to cover entire sheet).
+ */
+export async function fetchAllHistoricalData(
+  onProgress?: (loaded: number) => void
+): Promise<SensorData[]> {
+  return fetchHistoricalData(30000, onProgress);
 }
 
 /**
@@ -363,5 +407,5 @@ export async function fetchSensorData(): Promise<SensorData[]> {
     console.log('[fetchSensorData] Using mock data for development');
     return generateHistoricalMockData(192);
   }
-  return fetchAllHistoricalData();
+  return fetchHistoricalData(30000);
 }

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useDarkMode } from '../../context/DarkModeContext';
 import { fetchAllHistoricalData, SensorData } from '../../services/googleSheetsService';
+import { parseISTDate, getISTDateKey } from '../../utils/dateUtils';
 
 const HistoricalDataCalendar: React.FC = () => {
   const { darkMode } = useDarkMode();
@@ -17,40 +18,39 @@ const HistoricalDataCalendar: React.FC = () => {
     let cancelled = false;
     (async () => {
       try {
-        const normalizeDateKey = (s: string | undefined): string | null => {
-          if (!s) return null;
-          const t = s.replace('T', ' ').replace('_', ' ').trim();
-          const m1 = t.match(/(\d{4})[-/](\d{2})[-/](\d{2})/);
-          if (m1) return `${m1[1]}-${m1[2]}-${m1[3]}`;
-          const m2 = t.match(/(\d{2})[-/](\d{2})[-/](\d{4})/);
-          if (m2) return `${m2[3]}-${m2[2]}-${m2[1]}`;
-          const d = new Date(t);
-          if (isNaN(d.getTime())) return null;
-          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        };
-
         const rows: SensorData[] = await fetchAllHistoricalData();
 
         if (cancelled) return;
 
-        const agg: Record<string, { aqi: number; temperature: number; humidity: number; count: number }> = {};
+        const agg: Record<string, { aqiSum: number; aqiCount: number; tempSum: number; tempCount: number; humSum: number; humCount: number }> = {};
         for (const r of rows) {
-          const dateKey = normalizeDateKey(r.lastUpdated as string | undefined);
-          if (!dateKey) continue;
-          const aqi = Number(r.aqi25val || 0);
-          const temp = Number(r.temperature || 0);
-          const hum = Number(r.humidity || 0);
-          const cur = agg[dateKey] || { aqi: 0, temperature: 0, humidity: 0, count: 0 };
-          agg[dateKey] = { aqi: cur.aqi + aqi, temperature: cur.temperature + temp, humidity: cur.humidity + hum, count: cur.count + 1 };
+          const d = parseISTDate(r.lastUpdated as string | undefined);
+          if (!d) continue;
+          const dateKey = getISTDateKey(d);
+          const cur = agg[dateKey] || { aqiSum: 0, aqiCount: 0, tempSum: 0, tempCount: 0, humSum: 0, humCount: 0 };
+          
+          if (r.aqi25val !== null && r.aqi25val !== undefined && !isNaN(Number(r.aqi25val))) {
+            cur.aqiSum += Number(r.aqi25val);
+            cur.aqiCount++;
+          }
+          if (r.temperature !== null && r.temperature !== undefined && Number(r.temperature) > 0) {
+            cur.tempSum += Number(r.temperature);
+            cur.tempCount++;
+          }
+          if (r.humidity !== null && r.humidity !== undefined && Number(r.humidity) > 0) {
+            cur.humSum += Number(r.humidity);
+            cur.humCount++;
+          }
+          agg[dateKey] = cur;
         }
 
         const averaged: Record<string, { aqi: number; temperature: number; humidity: number; count: number }> = {};
         Object.entries(agg).forEach(([k, v]) => {
           averaged[k] = {
-            aqi: Math.round(v.aqi / v.count),
-            temperature: Math.round((v.temperature / v.count) * 10) / 10,
-            humidity: Math.round(v.humidity / v.count),
-            count: v.count,
+            aqi: v.aqiCount > 0 ? Math.round(v.aqiSum / v.aqiCount) : 0,
+            temperature: v.tempCount > 0 ? Math.round((v.tempSum / v.tempCount) * 10) / 10 : 0,
+            humidity: v.humCount > 0 ? Math.round(v.humSum / v.humCount) : 0,
+            count: Math.max(v.aqiCount, v.tempCount, v.humCount),
           };
         });
 

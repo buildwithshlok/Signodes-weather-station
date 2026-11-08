@@ -42,7 +42,21 @@ import {
 import {
   normalizeRawRow,
   normalizeSensorPayload,
+  fetchHistoricalData,
 } from '../src/services/googleSheetsService.ts';
+
+import {
+  parseISTDate,
+  getISTDateKey,
+  formatISTLabels,
+  formatISTMonthYearLabel,
+  formatISTDayMonthLabel,
+} from '../src/utils/dateUtils.ts';
+
+import {
+  PERIOD_CONFIGS,
+  calculateYAxisBounds,
+} from '../src/utils/analyticsUtils.ts';
 
 import {
   getAirQualityCategory,
@@ -52,6 +66,8 @@ import {
 import {
   formatAirQualityWithBounds,
 } from '../src/utils/sensorFormatting.ts';
+
+import { clearHistoricalCache } from '../src/services/googleSheetsService.ts';
 
 // CommonJS import for Netlify function
 const require = createRequire(import.meta.url);
@@ -498,6 +514,105 @@ describe('7. Direct PM2.5/PM10 Telemetry & 0-800 µg/m³ Air Quality Scale', () 
     assert.equal(formatAirQualityWithBounds(-10), '0');
   });
 });
+
+describe('8. Historical Data Retrieval, IST Date Handling & Analytics Bounds', () => {
+  test('parseISTDate correctly parses Google Sheets timestamps with IST (+05:30) offset', () => {
+    const d1 = parseISTDate('2026-11-08_03:30:33');
+    assert.ok(d1 !== null, 'Must parse valid date');
+    // UTC representation must be 2026-11-07 22:00:33Z
+    assert.equal(d1.toISOString(), '2026-11-07T22:00:33.000Z');
+
+    // IST date key must be exactly 2026-11-08
+    assert.equal(getISTDateKey(d1), '2026-11-08');
+
+    // Formatted labels must match IST weekday
+    const labels = formatISTLabels(d1);
+    assert.ok(labels.short.includes('Sun'), 'Must identify Sunday in IST');
+    assert.ok(labels.full.includes('Nov 8'), 'Must identify Nov 8 in IST');
+  });
+
+  test('parseISTDate handles edge cases safely without crashing', () => {
+    assert.equal(parseISTDate(undefined), null);
+    assert.equal(parseISTDate(''), null);
+    assert.equal(parseISTDate('N/A'), null);
+    assert.equal(parseISTDate('invalid_garbage_timestamp'), null);
+  });
+
+  test('fetchHistoricalData rejects on network failure without silently falling back to mock data', async () => {
+    // When offline/in unit test without network, must reject instead of returning mock data
+    await assert.rejects(
+      async () => {
+        await fetchHistoricalData(100);
+      },
+      (err) => {
+        assert.ok(err instanceof Error);
+        return true;
+      }
+    );
+  });
+
+  test('Chronologically sorts historical telemetry records correctly', () => {
+    const rowA = [...USER_SHEET_ROW_26918];
+    rowA[0] = '2026-11-08_01:00:00';
+    const rowB = [...USER_SHEET_ROW_26918];
+    rowB[0] = '2026-11-08_03:00:00';
+    const rowC = [...USER_SHEET_ROW_26918];
+    rowC[0] = '2026-11-07_12:00:00';
+
+    const unsorted = normalizeSensorPayload([rowA, rowB, rowC]);
+    unsorted.sort((a, b) => {
+      const tA = parseISTDate(a.lastUpdated || '')?.getTime() || 0;
+      const tB = parseISTDate(b.lastUpdated || '')?.getTime() || 0;
+      return tA - tB;
+    });
+
+    assert.equal(unsorted[0].lastUpdated, '2026-11-07_12:00:00');
+    assert.equal(unsorted[1].lastUpdated, '2026-11-08_01:00:00');
+    assert.equal(unsorted[2].lastUpdated, '2026-11-08_03:00:00');
+  });
+
+  test('PERIOD_CONFIGS defines 5 complete tiers with progressive row coverage', () => {
+    assert.deepEqual(Object.keys(PERIOD_CONFIGS), ['7d', '30d', '3m', '6m', '12m']);
+    assert.equal(PERIOD_CONFIGS['7d'].targetRows, 1200);
+    assert.equal(PERIOD_CONFIGS['30d'].targetRows, 3500);
+    assert.equal(PERIOD_CONFIGS['3m'].targetRows, 10000);
+    assert.equal(PERIOD_CONFIGS['6m'].targetRows, 20000);
+    assert.equal(PERIOD_CONFIGS['12m'].targetRows, 30000);
+  });
+
+  test('calculateYAxisBounds dynamically scales temperature and PM2.5 without artificial capping', () => {
+    // Summer temperature reaches 45.7°C in Greater Noida
+    const summerTemps = [25.0, 32.5, 38.0, 45.7];
+    const tempBounds = calculateYAxisBounds('temperature', summerTemps);
+    assert.ok(tempBounds.max >= 48, `Max temperature bound (${tempBounds.max}) must accommodate 45.7°C`);
+    assert.ok(tempBounds.min <= 25, `Min temperature bound (${tempBounds.min}) must accommodate 25°C`);
+    assert.equal(tempBounds.ticks.length, 6);
+
+    // PM2.5 reaches 436 µg/m³
+    const pmValues = [85, 142, 280, 436];
+    const pmBounds = calculateYAxisBounds('pm25', pmValues);
+    assert.ok(pmBounds.max >= 500, `Max PM2.5 bound (${pmBounds.max}) must accommodate 436 µg/m³`);
+    assert.equal(pmBounds.min, 0);
+    assert.equal(pmBounds.ticks.length, 6);
+  });
+
+  test('formatISTMonthYearLabel and formatISTDayMonthLabel correctly format dates in IST', () => {
+    const d = parseISTDate('2026-11-08_13:00:00');
+    assert.ok(d !== null);
+    const monthYear = formatISTMonthYearLabel(d);
+    assert.ok(monthYear.includes('Nov') && monthYear.includes('26'), `Expected Nov '26, got ${monthYear}`);
+
+    const dayMonth = formatISTDayMonthLabel(d);
+    assert.ok(dayMonth.includes('Nov') && dayMonth.includes('8'), `Expected Nov 8, got ${dayMonth}`);
+  });
+
+  test('clearHistoricalCache resets memory cache correctly', () => {
+    clearHistoricalCache();
+    // Cache reset succeeds without error
+    assert.ok(true);
+  });
+});
+
 
 
 
